@@ -1308,7 +1308,125 @@ function loop() {
   drawSpecialBanner();
 }
 
-requestAnimationFrame(loop);
+// ============================================================
+// UNIT TESTS — URL に ?test を付けて開くと実行: street-brawler-mobile.html?test
+// ============================================================
+if (location.search.includes('test')) {
+  // 音を無効化
+  window.beep = () => {};
+
+  // ミニテストフレームワーク
+  const _T=[], _R=[];
+  const t  = (name,fn) => _T.push({name,fn});
+  const eq = (a,b,msg) => { if(a!==b) throw new Error((msg?msg+': ':'')+`expected ${JSON.stringify(b)}, got ${JSON.stringify(a)}`); };
+  const near = (a,b,msg) => { if(Math.abs(a-b)>0.01) throw new Error((msg?msg+': ':'')+`expected ~${b}, got ${a}`); };
+  const mkF  = (id,right=true,x=300) => new Fighter(x,right,CHARS[id]);
+  const mkI  = (o={}) => ({punch:false,kick:false,left:false,right:false,up:false,down:false,block:false,special:false,...o});
+
+  // ---- キャラクター定義 ----
+  t('CHARS: icchi が存在する',          () => eq(CHARS.icchi.id, 'icchi'));
+  t('CHARS: otousan.jumpVel = -18',     () => eq(CHARS.otousan.jumpVel, -18));
+  t('CHARS: otousan.kickDmg = 10',      () => eq(CHARS.otousan.kickDmg, 10));
+  t('CHARS: otousan.punchIsProjectile', () => eq(CHARS.otousan.punchIsProjectile, true));
+  t('CHARS: yuuri.punchDmg = 16',       () => eq(CHARS.yuuri.punchDmg, 16));
+  t('CHARS: yuuri.kickDmg = 24',        () => eq(CHARS.yuuri.kickDmg, 24));
+  t('CHARS: icchi.walkSpd = 6.5',       () => eq(CHARS.icchi.walkSpd, 6.5));
+  t('CHARS: soyo.jumpVel = -24 (最高)', () => eq(CHARS.soyo.jumpVel, -24));
+  t('CHARS: okaasan.punchDmg = 9',      () => eq(CHARS.okaasan.punchDmg, 9));
+  t('CHAR_LIST は 5 キャラ',            () => eq(CHAR_LIST.length, 5));
+
+  // ---- Fighter コンストラクタ ----
+  t('Fighter: hp=100 で開始',        () => eq(mkF('icchi').hp, 100));
+  t('Fighter: state=idle で開始',    () => eq(mkF('icchi').state, 'idle'));
+  t('Fighter: onGround=true で開始', () => eq(mkF('icchi').onGround, true));
+  t('Fighter: guardFlash=0 で開始',  () => eq(mkF('icchi').guardFlash, 0));
+  t('Fighter: guardMode=false で開始',() => eq(mkF('icchi').guardMode, false));
+  t('Fighter: dir=1 (右向き)',        () => eq(mkF('icchi',true).dir,  1));
+  t('Fighter: dir=-1 (左向き)',       () => eq(mkF('icchi',false).dir,-1));
+
+  // ---- hurtbox ----
+  t('hurtbox: 立ち width = 56*scale', () => { const f=mkF('icchi'); near(f.hurtbox().w, 56*CHARS.icchi.scale); });
+  t('hurtbox: 立ち height = 125*scale',() => { const f=mkF('icchi'); near(f.hurtbox().h,125*CHARS.icchi.scale); });
+  t('hurtbox: しゃがみ は低い',        () => { const f=mkF('icchi'); f.state='crouch'; near(f.hurtbox().h, 82*CHARS.icchi.scale); });
+  t('hurtbox: しゃがみ は狭い',        () => { const f=mkF('icchi'); f.state='crouch'; near(f.hurtbox().w, 48*CHARS.icchi.scale); });
+
+  // ---- hitbox ----
+  t('hitbox: idle は null',               () => eq(mkF('icchi').hitbox(), null));
+  t('hitbox: パンチ発生フレームで返る',   () => { const f=mkF('icchi'); f.state='punch'; f.st=CHARS.icchi.punchS; if(f.hitbox()===null) throw new Error('hitbox expected'); });
+  t('hitbox: パンチ発生前は null',        () => { const f=mkF('icchi'); f.state='punch'; f.st=0; eq(f.hitbox(),null); });
+  t('hitbox: キック発生フレームで返る',   () => { const f=mkF('icchi'); f.state='kick';  f.st=CHARS.icchi.kickS; if(f.hitbox()===null) throw new Error('hitbox expected'); });
+  t('hitbox: jatk 発生フレームで返る',    () => { const f=mkF('icchi'); f.state='jatk';  f.st=CHARS.icchi.jatkS; if(f.hitbox()===null) throw new Error('hitbox expected'); });
+
+  // ---- damageInfo ----
+  t('damageInfo: idle は null',          () => eq(mkF('yuuri').damageInfo(), null));
+  t('damageInfo: punch → punchDmg',     () => { const f=mkF('yuuri'); f.state='punch'; eq(f.damageInfo().dmg, CHARS.yuuri.punchDmg); eq(f.damageInfo().type,'punch'); });
+  t('damageInfo: kick → kickDmg',       () => { const f=mkF('otousan'); f.state='kick'; eq(f.damageInfo().dmg, CHARS.otousan.kickDmg); eq(f.damageInfo().type,'kick'); });
+  t('damageInfo: jatk → jatkDmg',       () => { const f=mkF('icchi'); f.state='jatk'; eq(f.damageInfo().dmg, CHARS.icchi.jatkDmg); eq(f.damageInfo().type,'jatk'); });
+
+  // ---- takeHit: 基本 ----
+  t('takeHit: ダメージが入る',           () => { const f=mkF('icchi'); f.takeHit({dmg:8,stun:16,push:0,type:'punch'},1); eq(f.hp,92); });
+  t('takeHit: state → hurt',            () => { const f=mkF('icchi'); f.takeHit({dmg:8,stun:16,push:0,type:'punch'},1); eq(f.state,'hurt'); });
+  t('takeHit: dead なら false を返す',   () => { const f=mkF('icchi'); f.state='dead'; eq(f.takeHit({dmg:8,stun:16,push:0,type:'punch'},1),false); });
+  t('takeHit: hitStun 中は false',       () => { const f=mkF('icchi'); f.hitStun=10; eq(f.takeHit({dmg:8,stun:16,push:0,type:'punch'},1),false); eq(f.hp,100); });
+  t('takeHit: hp=0 → state=dead',       () => { const f=mkF('icchi'); f.hp=5; f.takeHit({dmg:10,stun:16,push:0,type:'punch'},1); eq(f.hp,0); eq(f.state,'dead'); });
+  t('takeHit: specialGauge が増加',      () => { const f=mkF('icchi'); const b=f.specialGauge; f.takeHit({dmg:5,stun:16,push:0,type:'punch'},1); if(f.specialGauge<=b) throw new Error('gauge should increase'); });
+
+  // ---- takeHit: ガードシステム ----
+  // dir=1(右向き)に対して fromDir=-1(左から攻撃) → facing=true → ガード有効
+  t('立ちガード: パンチを防ぐ',     () => { const f=mkF('icchi',true); f.state='block'; f.guardMode=true; f.takeHit({dmg:8,stun:16,push:0,type:'punch'},-1); eq(f.hp,100); });
+  t('立ちガード: jatk を防ぐ',      () => { const f=mkF('icchi',true); f.state='block'; f.guardMode=true; f.takeHit({dmg:10,stun:16,push:0,type:'jatk'},-1); eq(f.hp,100); });
+  t('立ちガード: キックは防げない',  () => { const f=mkF('icchi',true); f.state='block'; f.guardMode=true; f.takeHit({dmg:8,stun:16,push:0,type:'kick'},-1); if(f.hp===100) throw new Error('standing guard must not block kick'); });
+  t('立ちガード: jkick は防げない',  () => { const f=mkF('icchi',true); f.state='block'; f.guardMode=true; f.takeHit({dmg:10,stun:16,push:0,type:'jkick'},-1); if(f.hp===100) throw new Error('standing guard must not block jkick'); });
+  t('しゃがみガード: キックを防ぐ',  () => { const f=mkF('icchi',true); f.state='crouch'; f.guardMode=true; f.takeHit({dmg:8,stun:16,push:0,type:'kick'},-1); eq(f.hp,100); });
+  t('しゃがみガード: jkick を防ぐ',  () => { const f=mkF('icchi',true); f.state='crouch'; f.guardMode=true; f.takeHit({dmg:10,stun:16,push:0,type:'jkick'},-1); eq(f.hp,100); });
+  t('しゃがみガード: パンチは防げない',() => { const f=mkF('icchi',true); f.state='crouch'; f.guardMode=true; f.takeHit({dmg:8,stun:16,push:0,type:'punch'},-1); if(f.hp===100) throw new Error('crouch guard must not block punch'); });
+  t('しゃがみ(ガードなし): キックは防げない',() => { const f=mkF('icchi',true); f.state='crouch'; f.guardMode=false; f.takeHit({dmg:8,stun:16,push:0,type:'kick'},-1); if(f.hp===100) throw new Error('unguarded crouch must not block kick'); });
+  t('背後からの攻撃はガード無効',    () => {
+    // dir=1, fromDir=1 → facing = 1!==1 = false → ガード無効
+    const f=mkF('icchi',true); f.state='block'; f.guardMode=true;
+    f.takeHit({dmg:8,stun:16,push:0,type:'punch'},1);
+    if(f.hp===100) throw new Error('back attack must bypass guard');
+  });
+  t('必殺技: 立ちガードでダメージ軽減', () => { const f=mkF('icchi',true); f.state='block'; f.guardMode=true; f.takeHit({dmg:28,stun:25,push:0,type:'special'},-1); eq(f.hp,89); /* floor(28*0.4)=11 */ });
+  t('必殺技: しゃがみガードでも軽減',   () => { const f=mkF('icchi',true); f.state='crouch'; f.guardMode=true; f.takeHit({dmg:28,stun:25,push:0,type:'special'},-1); eq(f.hp,89); });
+  t('ガード成立 → guardFlash がセット', () => { const f=mkF('icchi',true); f.state='block'; f.guardMode=true; f.takeHit({dmg:8,stun:16,push:0,type:'punch'},-1); if(f.guardFlash===0) throw new Error('guardFlash should be set'); });
+
+  // ---- guardMode (update() 経由) ----
+  t('update: block 状態 → guardMode=true',        () => { const f=mkF('icchi',true,300); f.state='block'; const o=mkF('yuuri',false,500); f.update(o,mkI()); eq(f.guardMode,true); });
+  t('update: crouch+block → guardMode=true',       () => { const f=mkF('icchi',true,300); f.state='crouch'; const o=mkF('yuuri',false,500); f.update(o,mkI({block:true,down:true})); eq(f.guardMode,true); });
+  t('update: crouch+block なし → guardMode=false', () => { const f=mkF('icchi',true,300); f.state='crouch'; const o=mkF('yuuri',false,500); f.update(o,mkI({down:true})); eq(f.guardMode,false); });
+  t('update: idle → guardMode=false',              () => { const f=mkF('icchi',true,300); f.state='idle';  const o=mkF('yuuri',false,500); f.update(o,mkI()); eq(f.guardMode,false); });
+
+  // ---- 実行 ----
+  _T.forEach(({name,fn}) => {
+    try { fn(); _R.push({name,pass:true}); }
+    catch(e) { _R.push({name,pass:false,err:e.message}); }
+  });
+
+  const passed=_R.filter(r=>r.pass).length, total=_R.length, failed=total-passed;
+  const div=document.createElement('div');
+  div.style.cssText='position:fixed;inset:0;overflow-y:auto;background:#0d1117;color:#e6edf3;font:13px "Consolas","Monaco",monospace;padding:20px 24px;z-index:9999;';
+  let h=`<div style="margin-bottom:16px">`;
+  h+=`<div style="font-size:20px;font-weight:bold;color:#fff;margin-bottom:6px">大乱闘 ウエダファミリー — Unit Tests</div>`;
+  h+=`<div style="font-size:14px;color:${failed===0?'#3fb950':'#f85149'}">`;
+  h+=`${passed} / ${total} passed`;
+  if(failed>0) h+=` &nbsp;— &nbsp;<strong>${failed} FAILED</strong>`; else h+=' &nbsp;✓ All passed';
+  h+=`</div></div>`;
+  h+=`<table style="border-collapse:collapse;width:100%;font-size:12px">`;
+  _R.forEach(({name,pass,err})=>{
+    h+=`<tr style="${pass?'':'background:#2d1515;'}border-bottom:1px solid #21262d">`;
+    h+=`<td style="padding:3px 8px;color:${pass?'#3fb950':'#f85149'};width:20px">${pass?'✓':'✗'}</td>`;
+    h+=`<td style="padding:3px 8px">${name}</td>`;
+    h+=`<td style="padding:3px 8px;color:#f85149">${pass?'':err}</td>`;
+    h+=`</tr>`;
+  });
+  h+=`</table>`;
+  div.innerHTML=h;
+  document.body.appendChild(div);
+
+} else {
+  requestAnimationFrame(loop);
+}
 </script>
 </body>
 </html>
