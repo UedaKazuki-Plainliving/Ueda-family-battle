@@ -306,8 +306,41 @@ const CHARS = {
     specialName:'ゴリラ攻撃', superName:'歌うたい攻撃', desc:'バランスタイプ',
     flavor:['万能バランス型','ゴリラ分身を召喚！','オールラウンダー'],
   },
+  kuppa: {
+    id:'kuppa', name:'クッパ', c1:'#886622', c2:'#cc4411',
+    walkSpd:2.6, jumpVel:-16, gravity:1.08,
+    punchDmg:0, kickDmg:18, jatkDmg:20,
+    punchDur:36, kickDur:40, jatkDur:28,
+    punchS:14, punchE:14, kickS:8, kickE:24, jatkS:7, jatkE:18,
+    punchIsProjectile:true, rangeBonus:1.0, hitStunGiven:28, pushback:20,
+    scale:1.22, limbW:12, bodyW:34, hairStyle:'horns',
+    specialName:'のしかかり', superName:'ハンマー乱打', desc:'パワー/飛び道具',
+    flavor:['パンチで火を吐く！','のしかかりが強力','動きは遅め'],
+  },
+  kinopio: {
+    id:'kinopio', name:'キノピオ', c1:'#cc2222', c2:'#ffffff',
+    walkSpd:7.2, jumpVel:-20, gravity:0.65,
+    punchDmg:5, kickDmg:7, jatkDmg:8,
+    punchDur:12, kickDur:22, jatkDur:14,
+    punchS:2, punchE:8, kickS:4, kickE:14, jatkS:3, jatkE:10,
+    rangeBonus:1.0, hitStunGiven:15, pushback:10,
+    scale:0.72, limbW:5, bodyW:15, hairStyle:'mushroom',
+    specialName:'キノコ飛ばし', superName:'巨大キノコ乱打', desc:'速攻タイプ',
+    flavor:['キノコを20本投げる！','動きが速い','パワーは低め'],
+  },
+  mario: {
+    id:'mario', name:'マリオ', c1:'#dd1100', c2:'#0055cc',
+    walkSpd:5.0, jumpVel:-19, gravity:0.75,
+    punchDmg:8, kickDmg:12, jatkDmg:14,
+    punchDur:16, kickDur:30, jatkDur:18,
+    punchS:3, punchE:10, kickS:5, kickE:18, jatkS:4, jatkE:12,
+    rangeBonus:1.0, hitStunGiven:18, pushback:14,
+    scale:0.95, limbW:8, bodyW:22, hairStyle:'cap',
+    specialName:'ファイヤーボール', superName:'超ファイヤー', desc:'バランスタイプ',
+    flavor:['ファイヤーボール10連射！','超必殺で3倍巨大弾！','オールラウンダー'],
+  },
 };
-const CHAR_LIST = [CHARS.icchi, CHARS.yuuri, CHARS.soyo, CHARS.otousan, CHARS.okaasan];
+const CHAR_LIST = [CHARS.icchi, CHARS.yuuri, CHARS.soyo, CHARS.otousan, CHARS.okaasan, CHARS.kuppa, CHARS.kinopio, CHARS.mario];
 
 // ---- Background ----
 const buildings = [];
@@ -464,18 +497,51 @@ function spawnBaseball(owner) {
     dmg:10, stun:18, push:20});
   beep(400,'sine',0.08,0.2);
 }
+function spawnFire(owner) {
+  projectiles.push({type:'fire', x:owner.x+owner.dir*48*owner.def.scale,
+    y:owner.y-80*owner.def.scale, vx:owner.dir*11, owner, t:80,
+    dmg:13, stun:20, push:15});
+  beep(220,'sawtooth',0.15,0.3);
+}
+function spawnHammer(owner, opp) {
+  const spread=Math.random()*240-120;
+  const tx=Math.max(30,Math.min(W-30,opp.x+spread));
+  projectiles.push({type:'hammer', x:tx, y:-20, vx:(Math.random()-0.5)*2,
+    vy:7+Math.random()*4, owner, t:100, dmg:8, stun:14, push:12});
+  if (Math.random()<0.3) beep(380+Math.random()*150,'square',0.04,0.12);
+}
+function spawnMushroom(owner, big=false) {
+  projectiles.push({type:'mushroom', x:owner.x+owner.dir*30*owner.def.scale,
+    y:owner.y-68*owner.def.scale, vx:owner.dir*(big?7:10), owner, t:90,
+    dmg:big?18:7, stun:big?22:12, push:big?18:10, big});
+  beep(big?280:480,'sine',0.07,0.18);
+}
+function spawnFireball(owner, big=false) {
+  projectiles.push({type:'fireball', x:owner.x+owner.dir*38*owner.def.scale,
+    y:owner.y-58*owner.def.scale, vx:owner.dir*(big?7:9), vy:-1,
+    owner, t:110, dmg:big?24:9, stun:big?28:14, push:big?22:12, big, bounced:0});
+  beep(big?160:320,'sawtooth',0.1,0.25);
+}
 
 function updateProjectiles(p1,p2) {
   for (let i=projectiles.length-1;i>=0;i--) {
     const proj=projectiles[i];
     proj.x+=proj.vx;
-    if (proj.vy!==undefined){proj.vy+=0.06;proj.y+=proj.vy;}
+    if (proj.type==='fireball') {
+      proj.vy+=0.35; proj.y+=proj.vy;
+      if (proj.y>=GROUND-8&&proj.bounced<3){proj.y=GROUND-8;proj.vy=-(3+Math.random()*2);proj.bounced++;beep(180,'sine',0.03,0.08);}
+    } else if (proj.type==='hammer') {
+      proj.vy+=0.25; proj.y+=proj.vy;
+      if (proj.y>GROUND+5){projectiles.splice(i,1);continue;}
+    } else if (proj.vy!==undefined){proj.vy+=0.06;proj.y+=proj.vy;}
     if (--proj.t<=0||proj.x<-100||proj.x>W+100){projectiles.splice(i,1);continue;}
     const target=proj.owner===p1?p2:p1;
     if (target.hp<=0||target.hitStun>0) continue;
     const hurt=target.hurtbox();
-    const px=proj.vx>0?proj.x-5:proj.x-65;
-    if (px<hurt.x+hurt.w&&px+70>hurt.x&&proj.y-20<hurt.y+hurt.h&&proj.y+20>hurt.y) {
+    const isCentered=proj.type==='hammer'||proj.type==='mushroom';
+    const px=isCentered?proj.x-22:(proj.vx>0?proj.x-5:proj.x-65);
+    const pw=isCentered?44:70;
+    if (px<hurt.x+hurt.w&&px+pw>hurt.x&&proj.y-20<hurt.y+hurt.h&&proj.y+20>hurt.y) {
       if (target.takeHit({dmg:proj.dmg,stun:proj.stun,push:proj.push,type:'special'},proj.vx>0?1:-1)) {
         if (proj.type==='ice') target.frozenFrames=Math.max(target.frozenFrames,140);
         proj.owner.specialGauge=Math.min(proj.owner.maxSpecialGauge,proj.owner.specialGauge+20);
@@ -551,6 +617,39 @@ function drawProjectiles() {
       ctx.beginPath(); ctx.rect(p.x-18,p.y-13,36,26); ctx.fill(); ctx.stroke();
       ctx.fillStyle='#003355'; ctx.font='bold 14px sans-serif'; ctx.textAlign='center';
       ctx.fillText('❄',p.x,p.y+5); ctx.globalAlpha=1; ctx.restore();
+    } else if (p.type==='fire') {
+      ctx.save(); ctx.translate(p.x,p.y);
+      const ft=Date.now()/50;
+      ctx.fillStyle='#ff8800'; ctx.beginPath(); ctx.ellipse(0,0,18,12,0,0,Math.PI*2); ctx.fill();
+      ctx.fillStyle='#ffdd00'; ctx.beginPath(); ctx.ellipse(0,0,10,7,0,0,Math.PI*2); ctx.fill();
+      for (let i=0;i<5;i++){
+        const a=(i/5)*Math.PI*2+ft*0.4, r=13+Math.sin(ft+i)*4;
+        ctx.globalAlpha=0.65; ctx.fillStyle='#ff4400';
+        ctx.beginPath(); ctx.arc(Math.cos(a)*r*0.7,Math.sin(a)*r*0.4,4,0,Math.PI*2); ctx.fill();
+      }
+      ctx.globalAlpha=1; ctx.restore();
+    } else if (p.type==='hammer') {
+      ctx.save(); ctx.translate(p.x,p.y); ctx.rotate(Date.now()/80+p.x*0.1);
+      ctx.fillStyle='#775533'; ctx.fillRect(-5,-18,10,18);
+      ctx.fillStyle='#555566'; ctx.fillRect(-14,-30,28,16);
+      ctx.restore();
+    } else if (p.type==='mushroom') {
+      ctx.save(); ctx.translate(p.x,p.y);
+      const ms=p.big?2:1; ctx.scale(ms,ms);
+      ctx.fillStyle='#ffeecc'; ctx.fillRect(-7,0,14,14);
+      ctx.fillStyle='#cc2222'; ctx.beginPath(); ctx.arc(0,-4,16,Math.PI,0); ctx.fill(); ctx.fillRect(-16,-4,32,4);
+      ctx.fillStyle='#ffffff';
+      [[0,-10],[8,-7],[-8,-7],[4,-15],[-4,-15]].forEach(([sx,sy])=>{ctx.beginPath();ctx.arc(sx,sy,3,0,Math.PI*2);ctx.fill();});
+      ctx.restore();
+    } else if (p.type==='fireball') {
+      ctx.save(); ctx.translate(p.x,p.y);
+      const fs=p.big?3:1; ctx.scale(fs,fs);
+      const ft2=Date.now()/40;
+      ctx.fillStyle='#ff6600'; ctx.beginPath(); ctx.arc(0,0,8,0,Math.PI*2); ctx.fill();
+      ctx.fillStyle='#ffee00'; ctx.beginPath(); ctx.arc(-2,-2,5,0,Math.PI*2); ctx.fill();
+      ctx.fillStyle='#ff2200'; ctx.globalAlpha=0.7;
+      for (let i=0;i<6;i++){const a=i/6*Math.PI*2+ft2;ctx.beginPath();ctx.arc(Math.cos(a)*9,Math.sin(a)*9,3,0,Math.PI*2);ctx.fill();}
+      ctx.globalAlpha=1; ctx.restore();
     }
   });
 }
@@ -1025,6 +1124,18 @@ class Fighter {
         if (noteFrames.includes(this.st)) spawnNoteProj(this,opp);
         if (this.st===35) spawnHogeProj(this,opp);
         if (this.st>=52){this.state='idle';this.st=0;}
+      } else if (id==='kuppa') {
+        // ハンマー乱打: 30発
+        if (this.st>0&&this.st<=60&&this.st%2===0) spawnHammer(this,opp);
+        if (this.st>=68){this.state='idle';this.st=0;}
+      } else if (id==='kinopio') {
+        // 巨大キノコ10本
+        if (this.st>0&&this.st<=60&&this.st%6===0) spawnMushroom(this,true);
+        if (this.st>=70){this.state='idle';this.st=0;}
+      } else if (id==='mario') {
+        // 超ファイヤー10発(3倍サイズ)
+        if (this.st>0&&this.st<=60&&this.st%6===0) spawnFireball(this,true);
+        if (this.st>=72){this.state='idle';this.st=0;}
       } else {
         // icchi, otousan: エンティティ召喚
         if (!this.superFired&&this.st===1){
@@ -1045,6 +1156,40 @@ class Fighter {
         if (this.y>=GROUND){this.y=GROUND;this.vy=0;this.onGround=true;this.state='idle';this.st=0;}
         this.x=Math.max(40,Math.min(W-40,this.x));
         if (this.x<=41||this.x>=W-41){this.state='idle';this.st=0;}
+      } else if (id==='kuppa') {
+        // のしかかり
+        if (this.superPhase===0) {
+          this.vy+=this.def.gravity; this.y+=this.vy;
+          const dx=opp.x-this.x;
+          if (Math.abs(dx)>8) this.x+=Math.sign(dx)*10;
+          this.x=Math.max(40,Math.min(W-40,this.x));
+          if (this.y>=GROUND) {
+            this.y=GROUND; this.vy=0; this.onGround=true;
+            if (Math.abs(this.x-opp.x)<80) {
+              this.superPhase=1; this.superHitActive=0;
+              beep(100,'sawtooth',0.35,0.5); spawnHit(opp.x,opp.y-50,true);
+            } else {this.state='idle';this.st=0;this.superPhase=0;}
+          }
+        } else {
+          this.x=Math.max(40,Math.min(W-40,opp.x));
+          this.y=GROUND; this.onGround=true;
+          this.superHitActive++;
+          if (this.superHitActive%30===0) {
+            if (opp.takeHit({dmg:10,stun:8,push:0,type:'special'},this.dir)) {
+              spawnHit(opp.x,opp.y-50); this.specialGauge=Math.min(this.maxSpecialGauge,this.specialGauge+6);
+              beep(150,'square',0.12,0.2);
+            }
+          }
+          if (opp.y<GROUND-5||this.superHitActive>=180) {this.state='idle';this.st=0;this.superPhase=0;}
+        }
+      } else if (id==='kinopio') {
+        // キノコ飛ばし 20本
+        if (this.st>0&&this.st<=60&&this.st%3===0) spawnMushroom(this);
+        if (this.st>=68){this.state='idle';this.st=0;}
+      } else if (id==='mario') {
+        // ファイヤーボール 10発
+        if (this.st%5===1&&this.st<=50) spawnFireball(this);
+        if (this.st>=60){this.state='idle';this.st=0;}
       } else {
         const fireFrame={'icchi':9,'soyo':8,'otousan':15,'okaasan':10}[id]??9;
         const endFrame={'icchi':26,'soyo':28,'otousan':60,'okaasan':30}[id]??26;
@@ -1092,12 +1237,14 @@ class Fighter {
         this.state='super';this.st=0;this.superFired=false;this.atkHit=false;this.specialGauge=0;
         if (this.def.id==='yuuri'){this.vy=-26;this.onGround=false;this.superPhase=0;this.airVx=0;}
         else if (this.def.id==='soyo'){this.superPhase=0;this.superTargetX=opp.x;this.superOriginX=this.x;this.superHitActive=0;}
+        else if (this.def.id==='kuppa'){this.superPhase=0;this.superHitActive=0;}
         triggerSuperFlash(this.def, this.x, this.y);
       } else {
         // 通常必殺技（ゲージ1/3消費）
         this.state='special';this.st=0;this.specialFired=false;this.punchFired=false;
         this.specialGauge=Math.max(0,this.specialGauge-Math.floor(this.maxSpecialGauge/3));
         if (this.def.id==='yuuri'){this.specialVx=this.dir*14;this.vy=-8;this.onGround=false;}
+        else if (this.def.id==='kuppa'){this.superPhase=0;this.vy=-20;this.onGround=false;}
         triggerSpecialFlash(this.def);
       }
       return;
@@ -1196,6 +1343,28 @@ class Fighter {
       ctx.beginPath(); ctx.arc(this.x,this.y-70*s,50*s,0,Math.PI*2); ctx.fill();
       ctx.globalAlpha=1; ctx.restore();
     }
+    if (this.state==='super'&&this.def.id==='kuppa') {
+      const s=this.def.scale, pulse=0.5+0.4*Math.sin(Date.now()/70);
+      ctx.save(); ctx.globalAlpha=pulse*0.45; ctx.fillStyle='#ff4400';
+      ctx.shadowBlur=36; ctx.shadowColor='#ff8800';
+      ctx.beginPath(); ctx.arc(this.x,this.y-65*s,58*s,0,Math.PI*2); ctx.fill();
+      ctx.globalAlpha=1; ctx.shadowBlur=0; ctx.restore();
+    }
+    if (this.state==='super'&&this.def.id==='mario') {
+      // マリオが巨大化
+      const s=this.def.scale;
+      ctx.save(); ctx.translate(this.x,this.y);
+      if (this.dir===-1) ctx.scale(-1,1); ctx.scale(s*2.0,s*2.0);
+      this._shape(); ctx.restore();
+      ctx.fillStyle='#ffee00'; ctx.font='bold 14px sans-serif'; ctx.textAlign='center';
+      ctx.fillText('★超ファイヤー★',this.x,this.y-(220*s)); return;
+    }
+    if (this.state==='super'&&this.def.id==='kinopio') {
+      const s=this.def.scale, pulse=0.4+0.35*Math.sin(Date.now()/85);
+      ctx.save(); ctx.globalAlpha=pulse*0.5; ctx.fillStyle=this.def.c1;
+      ctx.beginPath(); ctx.arc(this.x,this.y-55*s,44*s,0,Math.PI*2); ctx.fill();
+      ctx.globalAlpha=1; ctx.restore();
+    }
     // --- 通常必殺技ビジュアル (yuuri) ---
     if (this.state==='special'&&this.def.id==='yuuri') {
       ctx.save(); ctx.translate(this.x,this.y-35);
@@ -1217,6 +1386,22 @@ class Fighter {
       const aura=Math.min(1,this.st/8);
       ctx.save(); ctx.globalAlpha=aura*0.3; ctx.fillStyle='#22cc44';
       ctx.beginPath(); ctx.arc(this.x,this.y-50,40*aura,0,Math.PI*2); ctx.fill();
+      ctx.globalAlpha=1; ctx.restore();
+    }
+    if (this.state==='special'&&this.def.id==='kuppa'&&this.superPhase===1) {
+      // のしかかり中: 重圧エフェクト
+      const s=this.def.scale;
+      ctx.save(); ctx.globalAlpha=0.5+0.3*Math.sin(Date.now()/60); ctx.fillStyle='#884400';
+      ctx.shadowBlur=22; ctx.shadowColor='#ff6600';
+      ctx.beginPath(); ctx.arc(this.x,this.y-55*s,48*s,0,Math.PI*2); ctx.fill();
+      ctx.globalAlpha=1; ctx.shadowBlur=0; ctx.restore();
+      ctx.fillStyle='#ffcc00'; ctx.font=`bold ${Math.round(11*s)}px sans-serif`; ctx.textAlign='center';
+      ctx.fillText('のしかかり中!',this.x,this.y-(145*s));
+    }
+    if (this.state==='special'&&(this.def.id==='kinopio'||this.def.id==='mario')) {
+      const aura=Math.min(1,this.st/8);
+      ctx.save(); ctx.globalAlpha=aura*0.3; ctx.fillStyle=this.def.c1;
+      ctx.beginPath(); ctx.arc(this.x,this.y-55,38*aura,0,Math.PI*2); ctx.fill();
       ctx.globalAlpha=1; ctx.restore();
     }
     // Freeze effect
@@ -1423,6 +1608,26 @@ class Fighter {
       ctx.fillStyle='rgba(100,100,100,0.5)'; ctx.font='bold 11px sans-serif'; ctx.textAlign='center';
       ctx.fillText('ゆ',0,beltY-8);
     }
+    if (def.id==='kuppa') {
+      // Shell spikes on back
+      ctx.fillStyle='#ffeeaa';
+      for (let i=0;i<4;i++){const sx=-bw/2+(i+0.5)*bw/4,sy=bodyTop+i*12; ctx.beginPath();ctx.moveTo(sx-5,sy+8);ctx.lineTo(sx,sy-4);ctx.lineTo(sx+5,sy+8);ctx.closePath();ctx.fill();}
+    }
+    if (def.id==='mario') {
+      // Blue overalls straps
+      ctx.fillStyle=c2;
+      ctx.fillRect(-bw/2,bodyTop,bw,bodyH);
+      ctx.fillStyle=c1; ctx.fillRect(-bw/2,bodyTop,bw,bodyH*0.38);
+      ctx.fillRect(-bw/2,beltY,bw,bodyH-bodyH*0.38-8);
+      ctx.fillStyle=c2; ctx.fillRect(-bw/2,beltY,bw,8);
+      ctx.fillRect(-6,bodyTop-4,12,bodyH*0.38+4);
+    }
+    if (def.id==='kinopio') {
+      // White vest
+      ctx.fillStyle='#ffffff'; ctx.fillRect(-bw/2+2,bodyTop+2,bw-4,bodyH-4);
+      ctx.fillStyle=c1; ctx.fillRect(-bw/2,beltY,bw,8);
+      ctx.fillStyle='#cc2222'; ctx.beginPath(); ctx.arc(0,bodyTop+bodyH/2,5,0,Math.PI*2); ctx.fill();
+    }
 
     ctx.lineWidth=lw; ctx.strokeStyle=c1;
     if (punchOn) {
@@ -1483,7 +1688,7 @@ class Fighter {
       ctx.fillStyle='#FFCC99';
       ctx.beginPath(); ctx.arc(bw/2-6,aY-26,lw*0.8,0,Math.PI*2); ctx.fill();
       ctx.beginPath(); ctx.arc(bw/2-2,aY-24,lw*0.8,0,Math.PI*2); ctx.fill();
-    } else if (isSpecial&&(def.id==='icchi'||def.id==='soyo'||def.id==='okaasan'||def.id==='otousan')) {
+    } else if (isSpecial&&(def.id==='icchi'||def.id==='soyo'||def.id==='okaasan'||def.id==='otousan'||def.id==='kuppa'||def.id==='kinopio'||def.id==='mario')) {
       const raise=chargeRaise*28;
       ctx.beginPath(); ctx.moveTo(bw/2-4,aY); ctx.lineTo(bw/2+18,aY-21-raise); ctx.stroke();
       ctx.beginPath(); ctx.moveTo(-bw/2+4,aY); ctx.lineTo(-bw/2-18,aY-21-raise); ctx.stroke();
@@ -1612,6 +1817,23 @@ class Fighter {
       ctx.fillStyle=hc; ctx.beginPath(); ctx.arc(0,hy-8,14,Math.PI,0); ctx.fill();
       ctx.fillRect(-14,hy-14,28,7);
       ctx.fillStyle=c2; ctx.fillRect(-19,hy-8,38,5);
+    } else if (hs==='horns') {
+      // クッパ: 緑の頭+クリーム色の角
+      ctx.fillStyle='#557733';
+      ctx.beginPath(); ctx.arc(0,hy-8,14,Math.PI,0); ctx.fill();
+      ctx.fillRect(-14,hy-14,28,8);
+      ctx.fillStyle='#ffeeaa';
+      ctx.beginPath(); ctx.moveTo(-10,hy-18); ctx.lineTo(-7,hy-38); ctx.lineTo(-2,hy-18); ctx.closePath(); ctx.fill();
+      ctx.beginPath(); ctx.moveTo(2,hy-18); ctx.lineTo(7,hy-38); ctx.lineTo(10,hy-18); ctx.closePath(); ctx.fill();
+    } else if (hs==='mushroom') {
+      // キノピオ: 大きなキノコ帽子
+      ctx.fillStyle='#cc2222';
+      ctx.beginPath(); ctx.ellipse(0,hy-12,20,10,0,Math.PI,0); ctx.fill();
+      ctx.beginPath(); ctx.arc(0,hy-16,15,Math.PI,0); ctx.fill();
+      ctx.fillStyle='#ffffff';
+      [[0,hy-22],[8,hy-16],[-8,hy-16],[4,hy-26],[-4,hy-26]].forEach(([sx,sy])=>{
+        ctx.beginPath(); ctx.arc(sx,sy,3.5,0,Math.PI*2); ctx.fill();
+      });
     } else {
       ctx.fillStyle=hc; ctx.beginPath(); ctx.arc(0,hy-10,13,Math.PI,0); ctx.fill();
       ctx.fillStyle=c2; ctx.fillRect(-18,hy-7,36,6);
@@ -1625,6 +1847,17 @@ class Fighter {
       ctx.fillStyle='#222'; ctx.fillRect(4,hy-5,5,4);
     }
 
+    if (def.id==='mario') {
+      // マリオのひげ
+      ctx.fillStyle='#332200';
+      ctx.beginPath(); ctx.arc(-2,hy+4,9,Math.PI,0); ctx.fill();
+      ctx.beginPath(); ctx.arc(-7,hy+2,4,Math.PI,0); ctx.fill();
+      ctx.beginPath(); ctx.arc(3,hy+2,4,Math.PI,0); ctx.fill();
+    }
+    if (def.id==='kuppa') {
+      // クッパの赤い目
+      ctx.fillStyle='#dd2200'; ctx.fillRect(-5,hy-5,5,4); ctx.fillRect(4,hy-5,5,4);
+    }
     if (hs==='cap') {
       ctx.strokeStyle='#666'; ctx.lineWidth=1.5;
       ctx.beginPath(); ctx.arc(6,hy-3,5,0,Math.PI*2); ctx.stroke();
@@ -1851,7 +2084,7 @@ function drawIntro() {
   ctx.strokeText('大乱闘　ウエダファミリー',W/2,150);
   ctx.fillStyle='#ffdd00'; ctx.fillText('大乱闘　ウエダファミリー',W/2,150);
   ctx.font='18px sans-serif'; ctx.fillStyle='#aaa';
-  ctx.fillText('対戦格闘ゲーム　全5キャラ',W/2,195);
+  ctx.fillText('対戦格闘ゲーム　全8キャラ',W/2,195);
   if (IS_TOUCH) {
     ctx.font='16px sans-serif'; ctx.fillStyle='#888';
     ctx.fillText('必殺技ゲージMAXで必殺技発動！',W/2,240);
@@ -2227,8 +2460,8 @@ function loop() {
 
     if (p1.specialFired){p1.specialFired=false;spawnSpecialEffect(p1,p2);}
     if (p2.specialFired){p2.specialFired=false;spawnSpecialEffect(p2,p1);}
-    if (p1.punchFired&&p1.def.punchIsProjectile){p1.punchFired=false;spawnBaseball(p1);}
-    if (p2.punchFired&&p2.def.punchIsProjectile){p2.punchFired=false;spawnBaseball(p2);}
+    if (p1.punchFired&&p1.def.punchIsProjectile){p1.punchFired=false;p1.def.id==='kuppa'?spawnFire(p1):spawnBaseball(p1);}
+    if (p2.punchFired&&p2.def.punchIsProjectile){p2.punchFired=false;p2.def.id==='kuppa'?spawnFire(p2):spawnBaseball(p2);}
 
     updateProjectiles(p1,p2);
     updateHurdles(p1,p2);
@@ -2469,7 +2702,7 @@ if (location.search.includes('test')) {
   t('CHARS: icchi.walkSpd = 6.5',       () => eq(CHARS.icchi.walkSpd, 6.5));
   t('CHARS: soyo.jumpVel = -19 (弱体化後)', () => eq(CHARS.soyo.jumpVel, -19));
   t('CHARS: okaasan.punchDmg = 9',      () => eq(CHARS.okaasan.punchDmg, 9));
-  t('CHAR_LIST は 5 キャラ',            () => eq(CHAR_LIST.length, 5));
+  t('CHAR_LIST は 8 キャラ',            () => eq(CHAR_LIST.length, 8));
 
   // ---- Fighter コンストラクタ ----
   t('Fighter: hp=100 で開始',        () => eq(mkF('icchi').hp, 100));
