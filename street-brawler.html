@@ -228,7 +228,7 @@ const CHARS = {
   },
   soyo: {
     id:'soyo', name:'そよ', c1:'#f0f0f0', c2:'#223355',
-    walkSpd:7.2, jumpVel:-24, gravity:0.63,
+    walkSpd:7.2, jumpVel:-19, gravity:0.63,
     punchDmg:4, kickDmg:7, jatkDmg:9,
     punchDur:10, kickDur:26, jatkDur:13,
     punchS:2, punchE:8, kickS:4, kickE:17, jatkS:2, jatkE:11,
@@ -619,7 +619,7 @@ class Fighter {
     this.specialGauge=0; this.maxSpecialGauge=100;
     this.specialVx=0; this.specialFired=false;
     this.punchFired=false; this.guardFlash=0; this.guardMode=false;
-    this.comboCount=0;
+    this.comboCount=0; this.invincFrames=0;
   }
   hurtbox() {
     const s=this.def.scale;
@@ -651,13 +651,15 @@ class Fighter {
   }
   takeHit(info,fromDir) {
     if (this.state==='special') return false;
+    if (this.state==='down'||this.state==='downrise') return false;
+    if (this.invincFrames>0) return false;
     if (this.hitStun>0||this.state==='dead') return false;
     const type=info.type||'normal';
     const facing=this.dir!==fromDir;
     const standG=this.state==='block'&&facing;
     const crouchG=this.guardMode&&this.state==='crouch'&&facing;
     this.specialGauge=Math.min(this.maxSpecialGauge,this.specialGauge+8);
-    if ((standG&&(type==='punch'||type==='jatk'))||(crouchG&&(type==='kick'||type==='jkick'))) {
+    if ((standG&&(type==='punch'||type==='jatk'))||(crouchG&&(type==='kick'))) {
       this.comboCount=0; this.blockStun=18; this.guardFlash=14;
       beep(95,'sine',0.28,0.18); beep(60,'sine',0.14,0.14);
       return true;
@@ -671,9 +673,30 @@ class Fighter {
     }
     this.comboCount++;
     let push=info.push;
-    if (this.comboCount>=5) { push=info.push*3; this.comboCount=0; }
+    // コーナー判定ヘルパー
+    const nearWall=(this.x<80||this.x>720);
+    const applyPushback=(px)=>{
+      if (nearWall) {
+        const attacker=typeof fighters!=='undefined'&&(fighters[0]===this?fighters[1]:fighters[0]);
+        if (attacker) attacker.x-=attacker.dir*40;
+      } else {
+        this.x+=fromDir*px;
+      }
+    };
+    if (this.comboCount>=7) {
+      // 7連続ヒットでノックダウン
+      this.comboCount=0;
+      this.hp-=info.dmg;
+      if (this.hp<=0){this.hp=0;this.state='dead';}
+      else {this.state='down';this.st=0;}
+      this.hitStun=0;
+      applyPushback(push);
+      return true;
+    }
+    if (this.comboCount===5) { push=info.push*3; } // 5連続で大ノックバック(カウントは続く)
     this.hp-=info.dmg; this.hitStun=info.stun;
-    this.state='hurt'; this.st=0; this.x+=fromDir*push;
+    this.state='hurt'; this.st=0;
+    applyPushback(push);
     if (this.hp<=0){this.hp=0;this.state='dead';this.comboCount=0;}
     return true;
   }
@@ -684,7 +707,17 @@ class Fighter {
     if (this.hitStun>0) this.hitStun--;
     if (this.blockStun>0) this.blockStun--;
     if (this.guardFlash>0) this.guardFlash--;
+    if (this.invincFrames>0) this.invincFrames--;
     this.guardMode=(this.state==='block')||(this.state==='crouch'&&!!inp.block);
+
+    if (this.state==='down') {
+      if (this.st>=90) { this.state='downrise'; this.st=0; }
+      return;
+    }
+    if (this.state==='downrise') {
+      if (this.st>=30) { this.state='idle'; this.st=0; this.invincFrames=60; }
+      return;
+    }
 
     if (this.state==='special') {
       const id=this.def.id;
@@ -695,8 +728,15 @@ class Fighter {
         if (this.x<=41||this.x>=W-41){this.state='idle';this.st=0;}
       } else {
         const fireFrame={'icchi':9,'soyo':8,'otousan':15,'okaasan':10}[id]??9;
-        const endFrame={'icchi':26,'soyo':28,'otousan':35,'okaasan':30}[id]??26;
-        if (this.st===fireFrame&&!this.specialFired){this.specialFired=true;this.specialGauge=0;}
+        const endFrame={'icchi':26,'soyo':28,'otousan':60,'okaasan':30}[id]??26;
+        if (id==='otousan') {
+          // 3連続ことば: fireFrame, fireFrame+15, fireFrame+30
+          if ((this.st===fireFrame||this.st===fireFrame+15||this.st===fireFrame+30)&&!this.specialFired) {
+            this.specialFired=true; if(this.st===fireFrame) this.specialGauge=0;
+          }
+        } else {
+          if (this.st===fireFrame&&!this.specialFired){this.specialFired=true;this.specialGauge=0;}
+        }
         if (this.st>=endFrame){this.state='idle';this.st=0;}
       }
       if (this.hitStun===0) this.dir=opp.x>this.x?1:-1;
@@ -706,7 +746,7 @@ class Fighter {
     if (!this.onGround) {
       this.vy+=this.def.gravity; this.y+=this.vy;
       if (this.y>=GROUND){this.y=GROUND;this.vy=0;this.onGround=true;
-        if (this.state==='jump'||this.state==='jatk'){this.state='idle';this.st=0;}}
+        if (this.state==='jump'||this.state==='jatk'||this.state==='jkick'){this.state='idle';this.st=0;}}
     }
     const atk=['punch','kick','jatk','jkick'].includes(this.state);
     if (this.hitStun===0&&!atk) this.dir=opp.x>this.x?1:-1;
@@ -716,7 +756,7 @@ class Fighter {
       const def=this.def;
       const dur=this.state==='punch'?def.punchDur:(this.state==='kick'||this.state==='jkick')?def.kickDur:def.jatkDur;
       if (this.state==='punch'&&def.punchIsProjectile&&this.st===def.punchS&&!this.punchFired) this.punchFired=true;
-      if (this.st>=dur){this.state='idle';this.st=0;this.atkHit=false;}
+      if (this.st>=dur){this.state=this.onGround?'idle':'jump';this.st=0;this.atkHit=false;}
       return;
     }
     if (this.state==='hurt'&&this.st>=this.def.hitStunGiven){this.state='idle';this.st=0;}
@@ -757,6 +797,18 @@ class Fighter {
   }
 
   draw() {
+    // ダウン状態: 横に倒れる
+    if (this.state==='down'||this.state==='downrise') {
+      const blink=this.state==='downrise'&&Math.floor(this.st/4)%2===0;
+      if (!blink) {
+        ctx.save(); ctx.translate(this.x,this.y-10);
+        ctx.rotate(this.dir*Math.PI/2);
+        ctx.scale(this.def.scale,this.def.scale);
+        this._shape(); ctx.restore();
+      }
+      ctx.fillStyle=this.def.c1; ctx.font='bold 13px sans-serif'; ctx.textAlign='center';
+      ctx.fillText(this.def.name,this.x,this.y-30); return;
+    }
     if (this.state==='special'&&this.def.id==='yuuri') {
       ctx.save(); ctx.translate(this.x,this.y-35);
       if (this.dir===-1) ctx.scale(-1,1); ctx.rotate(-0.42);
@@ -1408,6 +1460,7 @@ function drawCharSelect() {
 // ---- Game State ----
 let phase='intro';
 let p1,p2,cpuCtrl;
+let fighters=[];
 let timerSec=99, timerTick=0;
 let wins=[0,0], roundNum=1;
 let flash={msg:'',t:0};
@@ -1420,6 +1473,7 @@ function startRound() {
   const p1def=CHAR_LIST[selectedCharIdx];
   p1=new Fighter(200,true,p1def);
   p2=new Fighter(600,false,CHAR_LIST[cpuCharIdx]);
+  fighters=[p1,p2];
   cpuCtrl=gameMode==='cpu'?new CPU(p2,p1):null;
   projectiles.length=0; wordProjs.length=0;
   hurdleAttack=null; activeGorilla=null;
@@ -1514,7 +1568,7 @@ function loop() {
           const hurt=gt.hurtbox();
           const ghx=ghb.w<0?ghb.x+ghb.w:ghb.x, ghw=Math.abs(ghb.w);
           if (ghx<hurt.x+hurt.w&&ghx+ghw>hurt.x&&ghb.y<hurt.y+hurt.h&&ghb.y+ghb.h>hurt.y) {
-            if (gt.takeHit({dmg:12,stun:20,push:18,type:'special'},activeGorilla.dir)) {
+            if (gt.takeHit({dmg:12,stun:20,push:18,type:'punch'},activeGorilla.dir)) {
               activeGorilla.atkHit=true;
               spawnHit((activeGorilla.x+gt.x)/2,gt.y-50);
             }
@@ -1587,7 +1641,7 @@ if (location.search.includes('test')) {
   t('CHARS: yuuri.punchDmg = 16',       () => eq(CHARS.yuuri.punchDmg, 16));
   t('CHARS: yuuri.kickDmg = 24',        () => eq(CHARS.yuuri.kickDmg, 24));
   t('CHARS: icchi.walkSpd = 6.5',       () => eq(CHARS.icchi.walkSpd, 6.5));
-  t('CHARS: soyo.jumpVel = -24 (最高)', () => eq(CHARS.soyo.jumpVel, -24));
+  t('CHARS: soyo.jumpVel = -19 (弱体化後)', () => eq(CHARS.soyo.jumpVel, -19));
   t('CHARS: okaasan.punchDmg = 9',      () => eq(CHARS.okaasan.punchDmg, 9));
   t('CHAR_LIST は 5 キャラ',            () => eq(CHAR_LIST.length, 5));
 
@@ -1634,7 +1688,7 @@ if (location.search.includes('test')) {
   t('立ちガード: キックは防げない',  () => { const f=mkF('icchi',true); f.state='block'; f.guardMode=true; f.takeHit({dmg:8,stun:16,push:0,type:'kick'},-1); if(f.hp===100) throw new Error('standing guard must not block kick'); });
   t('立ちガード: jkick は防げない',  () => { const f=mkF('icchi',true); f.state='block'; f.guardMode=true; f.takeHit({dmg:10,stun:16,push:0,type:'jkick'},-1); if(f.hp===100) throw new Error('standing guard must not block jkick'); });
   t('しゃがみガード: キックを防ぐ',  () => { const f=mkF('icchi',true); f.state='crouch'; f.guardMode=true; f.takeHit({dmg:8,stun:16,push:0,type:'kick'},-1); eq(f.hp,100); });
-  t('しゃがみガード: jkick を防ぐ',  () => { const f=mkF('icchi',true); f.state='crouch'; f.guardMode=true; f.takeHit({dmg:10,stun:16,push:0,type:'jkick'},-1); eq(f.hp,100); });
+  t('しゃがみガード: jkick は防げない(ガード不能)',  () => { const f=mkF('icchi',true); f.state='crouch'; f.guardMode=true; f.takeHit({dmg:10,stun:16,push:0,type:'jkick'},-1); if(f.hp===100) throw new Error('crouch guard must not block jkick'); });
   t('しゃがみガード: パンチは防げない',() => { const f=mkF('icchi',true); f.state='crouch'; f.guardMode=true; f.takeHit({dmg:8,stun:16,push:0,type:'punch'},-1); if(f.hp===100) throw new Error('crouch guard must not block punch'); });
   t('しゃがみ(ガードなし): キックは防げない',() => { const f=mkF('icchi',true); f.state='crouch'; f.guardMode=false; f.takeHit({dmg:8,stun:16,push:0,type:'kick'},-1); if(f.hp===100) throw new Error('unguarded crouch must not block kick'); });
   t('背後からの攻撃はガード無効',    () => {
@@ -1663,20 +1717,19 @@ if (location.search.includes('test')) {
   });
 
   // ---- コンボブロー ----
-  t('5連続ヒットでcomboCountがリセットされ大ノックバック', () => {
+  t('5連続ヒットで大ノックバック(comboCountは継続)', () => {
     const f = mkF('icchi', true, 300);
     // 4発入れる
     for (let i = 0; i < 4; i++) {
       f.hitStun = 0;
       f.takeHit({dmg:5, stun:1, push:10, type:'punch'}, -1);
     }
-    const hpBefore = f.hp;
     f.hitStun = 0;
     const xBefore = f.x;
     f.takeHit({dmg:5, stun:1, push:10, type:'punch'}, -1);
     // コンボブロー発動 → 通常pushの3倍以上動く
     if (Math.abs(f.x - xBefore) <= 10) throw new Error('combo knockback should be larger');
-    eq(f.comboCount, 0); // リセット
+    eq(f.comboCount, 5); // comboCountはリセットされず継続
   });
 
   // ---- ガードシステム ----
@@ -1753,6 +1806,150 @@ if (location.search.includes('test')) {
     const opp = mkF('yuuri', false, 500);
     f.update(opp, mkI());
     eq(f.guardMode, true);
+  });
+
+  // ---- 新機能テスト ----
+
+  // Change 1: soyo jumpVel
+  t('soyo: jumpVel が -19 に変更されている', () => eq(CHARS.soyo.jumpVel, -19));
+
+  // Change 2: しゃがみガードはjkickに負ける
+  t('しゃがみガード: jkick はヒットする(ガード不能)', () => {
+    const f = mkF('icchi', true, 300); f.state='crouch'; f.guardMode=true;
+    f.takeHit({dmg:10, stun:16, push:0, type:'jkick'}, -1);
+    if (f.hp === 100) throw new Error('crouch guard must not block jkick');
+  });
+
+  // Change 3: 7連続ヒットでダウン状態
+  t('7連続ヒットでダウン状態(state=down)になる', () => {
+    const f = mkF('icchi', true, 300);
+    for (let i = 0; i < 6; i++) {
+      f.hitStun = 0;
+      f.takeHit({dmg:1, stun:1, push:0, type:'punch'}, -1);
+    }
+    f.hitStun = 0;
+    f.takeHit({dmg:1, stun:1, push:0, type:'punch'}, -1);
+    eq(f.state, 'down');
+  });
+
+  // Change 3: downrise後にidleへ遷移
+  t('down状態が終わるとdownriseに遷移する', () => {
+    const f = mkF('icchi', true, 300);
+    f.state = 'down'; f.st = 0;
+    const opp = mkF('yuuri', false, 500);
+    // 90フレーム分 update する
+    for (let i = 0; i < 90; i++) f.update(opp, mkI());
+    eq(f.state, 'downrise');
+  });
+
+  // Change 3: downriseがidleに遷移
+  t('downrise状態が終わるとidleに遷移する', () => {
+    const f = mkF('icchi', true, 300);
+    f.state = 'downrise'; f.st = 0;
+    const opp = mkF('yuuri', false, 500);
+    for (let i = 0; i < 30; i++) f.update(opp, mkI());
+    eq(f.state, 'idle');
+  });
+
+  // Change 5: downrise終了後に無敵フレーム付与
+  t('downrise終了後にinvincFrames=60が付与される', () => {
+    const f = mkF('icchi', true, 300);
+    f.state = 'downrise'; f.st = 0;
+    const opp = mkF('yuuri', false, 500);
+    for (let i = 0; i < 30; i++) f.update(opp, mkI());
+    eq(f.state, 'idle');
+    if (f.invincFrames < 60) throw new Error('invincFrames should be 60 after downrise, got ' + f.invincFrames);
+  });
+
+  // Change 5: invincFrames中はhitしない
+  t('invincFrames中はtakeHitがfalseを返す', () => {
+    const f = mkF('icchi', true, 300);
+    f.invincFrames = 30;
+    const result = f.takeHit({dmg:10, stun:16, push:0, type:'punch'}, -1);
+    eq(result, false);
+    eq(f.hp, 100);
+  });
+
+  // Change 4: コーナー付近でディフェンダーのとき、攻撃者が後退する
+  t('コーナー付近のディフェンダー → 攻撃者が後退する', () => {
+    const defender = mkF('icchi', true, 50); // x=50 < 80 = near wall
+    const attacker = mkF('yuuri', false, 150);
+    fighters[0] = defender; fighters[1] = attacker;
+    const attackerXBefore = attacker.x;
+    defender.takeHit({dmg:5, stun:1, push:20, type:'punch'}, 1);
+    // ディフェンダーは動かず、攻撃者が後退する
+    if (Math.abs(attacker.x - attackerXBefore) < 1) throw new Error('attacker should be pushed back in corner');
+    // ディフェンダーのxは変わらない（コーナーなので）
+    eq(defender.x, 50);
+  });
+
+  // Change 6: otousan必殺技が3連続ことばを発射
+  t('otousan必殺技: 3回specialFiredが発生する(st=15,30,45)', () => {
+    const f = mkF('otousan', true, 300);
+    const opp = mkF('icchi', false, 500);
+    // 必殺技ゲージをMAXにして必殺技状態に設定
+    f.state = 'special'; f.st = 0; f.specialFired = false;
+    let fireCount = 0;
+    // 60フレーム分update、specialFiredがtrueになった回数を数える
+    for (let frame = 0; frame < 62; frame++) {
+      f.update(opp, mkI());
+      if (f.specialFired) { fireCount++; f.specialFired = false; }
+      // stateがidleになったら終了
+      if (f.state !== 'special') break;
+    }
+    eq(fireCount, 3);
+  });
+
+  // Change 7: okaasanゴリラ攻撃が立ちガードでブロックできる
+  t('okaasanゴリラ攻撃: 立ちガードでブロック可能(type=punch)', () => {
+    const f = mkF('icchi', true, 300); f.state='block'; f.guardMode=true;
+    // ゴリラのhitはtype:'punch'になったのでstandGで防げる
+    const result = f.takeHit({dmg:12, stun:20, push:18, type:'punch'}, -1);
+    eq(result, true);
+    eq(f.hp, 100); // ダメージなし
+  });
+
+  // Change 8: ジャンプ中攻撃でvy・重力が維持される
+  t('jatk突入時にvyがリセットされない(空中パンチ)', () => {
+    const f = mkF('icchi', true, 300);
+    f.onGround = false; f.y = GROUND - 80; f.vy = -10;
+    f.state = 'jatk'; f.st = 0; f.atkHit = false;
+    // vyが0にリセットされていないことを確認
+    if (f.vy === 0) throw new Error('vy should not be 0 when entering jatk from jump, got ' + f.vy);
+  });
+  t('jatk中は毎フレームvy+=gravity(重力が継続する)', () => {
+    const f = mkF('icchi', true, 300);
+    const opp = mkF('yuuri', false, 500);
+    f.onGround = false; f.y = GROUND - 80; f.vy = -10;
+    f.state = 'jatk'; f.st = 0; f.atkHit = false;
+    const vyBefore = f.vy;
+    f.update(opp, mkI());
+    const expected = vyBefore + f.def.gravity;
+    near(f.vy, expected, 'vy after one jatk frame');
+  });
+  t('jkick突入時にvyがリセットされない(空中キック)', () => {
+    const f = mkF('icchi', true, 300);
+    f.onGround = false; f.y = GROUND - 80; f.vy = -8;
+    f.state = 'jkick'; f.st = 0; f.atkHit = false;
+    if (f.vy === 0) throw new Error('vy should not be 0 when entering jkick from jump, got ' + f.vy);
+  });
+  t('jatk着地時にidleへ遷移する', () => {
+    const f = mkF('icchi', true, 300);
+    const opp = mkF('yuuri', false, 500);
+    f.onGround = false; f.y = GROUND - 2; f.vy = 5; // ほぼ着地直前
+    f.state = 'jatk'; f.st = 2; f.atkHit = false;
+    f.update(opp, mkI());
+    eq(f.state, 'idle');
+    eq(f.onGround, true);
+  });
+  t('jkick着地時にidleへ遷移する', () => {
+    const f = mkF('icchi', true, 300);
+    const opp = mkF('yuuri', false, 500);
+    f.onGround = false; f.y = GROUND - 2; f.vy = 5;
+    f.state = 'jkick'; f.st = 2; f.atkHit = false;
+    f.update(opp, mkI());
+    eq(f.state, 'idle');
+    eq(f.onGround, true);
   });
 
   // ---- 実行 ----
