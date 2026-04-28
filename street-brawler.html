@@ -546,7 +546,7 @@ function updateProjectiles(p1,p2) {
     if (px<hurt.x+hurt.w&&px+pw>hurt.x&&proj.y-20<hurt.y+hurt.h&&proj.y+20>hurt.y) {
       if (target.takeHit({dmg:proj.dmg,stun:proj.stun,push:proj.push,type:'special'},proj.vx>0?1:-1)) {
         if (proj.type==='ice') target.frozenFrames=Math.max(target.frozenFrames,140);
-        proj.owner.specialGauge=Math.min(proj.owner.maxSpecialGauge,proj.owner.specialGauge+20);
+        if (proj.type==='baseball'||proj.type==='fire') proj.owner.specialGauge=Math.min(proj.owner.maxSpecialGauge,proj.owner.specialGauge+20);
         spawnHit(target.x,target.y-70);
         projectiles.splice(i,1);
       }
@@ -680,7 +680,6 @@ function updateHurdles(p1,p2) {
         if (px-38<hurt.x+hurt.w&&px+38>hurt.x&&hurdleAttack.ys[i]<hurt.y+hurt.h&&hurdleAttack.ys[i]+20>hurt.y) {
           if (f.takeHit({dmg:10,stun:16,push:10,type:'special'},px<f.x?-1:1)) {
             hurdleAttack.hit.add(key); spawnHit(f.x,f.y-50);
-            hurdleAttack.owner.specialGauge=Math.min(hurdleAttack.owner.maxSpecialGauge,hurdleAttack.owner.specialGauge+10);
           }
         }
       });
@@ -725,8 +724,7 @@ function updateWords(p1,p2) {
       const hurt=target.hurtbox();
       if (w.x>hurt.x&&w.x<hurt.x+hurt.w&&w.y>hurt.y&&w.y<hurt.y+hurt.h) {
         if (target.takeHit({dmg:6,stun:14,push:8,type:'special'},w.vx>0?1:-1)) {
-          w.hit=true; w.owner.specialGauge=Math.min(w.owner.maxSpecialGauge,w.owner.specialGauge+5);
-          spawnHit(target.x,target.y-50);
+          w.hit=true; spawnHit(target.x,target.y-50);
         }
       }
     }
@@ -1014,7 +1012,7 @@ class Fighter {
     const facing=this.dir!==fromDir;
     const standG=this.state==='block'&&facing;
     const crouchG=this.guardMode&&this.state==='crouch'&&facing;
-    this.specialGauge=Math.min(this.maxSpecialGauge,this.specialGauge+8);
+    if (type!=='special') this.specialGauge=Math.min(this.maxSpecialGauge,this.specialGauge+8);
     if ((standG&&(type==='punch'||type==='jatk'))||(crouchG&&(type==='kick'))) {
       this.comboCount=0; this.blockStun=18; this.guardFlash=14;
       beep(95,'sine',0.28,0.18); beep(60,'sine',0.14,0.14);
@@ -1178,7 +1176,7 @@ class Fighter {
           this.superHitActive++;
           if (this.superHitActive%30===0) {
             if (opp.takeHit({dmg:10,stun:8,push:0,type:'special'},this.dir)) {
-              spawnHit(opp.x,opp.y-50); this.specialGauge=Math.min(this.maxSpecialGauge,this.specialGauge+6);
+              spawnHit(opp.x,opp.y-50);
               beep(150,'square',0.12,0.2);
             }
           }
@@ -1995,7 +1993,7 @@ function checkCollision(a,b) {
     const info=a.damageInfo();
     if (info&&b.takeHit(info,a.dir)) {
       a.atkHit=true;
-      a.specialGauge=Math.min(a.maxSpecialGauge,a.specialGauge+12);
+      if (a.state!=='special'&&a.state!=='super') a.specialGauge=Math.min(a.maxSpecialGauge,a.specialGauge+12);
       spawnHit((a.x+b.x)/2,b.y-72,a.state==='special'||a.state==='super');
     }
   }
