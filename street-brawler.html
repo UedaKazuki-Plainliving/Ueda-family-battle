@@ -86,6 +86,7 @@ const IS_TOUCH = ('ontouchstart' in window) || navigator.maxTouchPoints > 0;
 const canvas = document.getElementById('game');
 const ctx = canvas.getContext('2d');
 const W = 800, H = 450, GROUND = 340;
+const EXIT_BTN = {x:5, y:5, w:52, h:24};
 
 // ---- Audio ----
 const audio = new (window.AudioContext || window.webkitAudioContext)();
@@ -102,7 +103,13 @@ function beep(freq, type, dur, vol = 0.25) {
 
 // ---- Input ----
 const keys = {};
-document.addEventListener('keydown', e => { keys[e.code] = true; e.preventDefault(); });
+document.addEventListener('keydown', e => {
+  if (e.code === 'Escape') {
+    const inFight = phase==='fight'||phase==='roundend'||phase==='countdown';
+    if (inFight) { exitToMenu(); return; }
+  }
+  keys[e.code] = true; e.preventDefault();
+});
 document.addEventListener('keyup',   e => { keys[e.code] = false; });
 function keyOnce(code) { if (keys[code]) { keys[code] = false; return true; } return false; }
 
@@ -162,6 +169,15 @@ document.addEventListener('touchcancel', e => e.preventDefault(), {passive: fals
 // Canvas tap handler for charselect & intro
 canvas.addEventListener('pointerdown', e => {
   if (audio.state === 'suspended') audio.resume();
+  const inFight = phase==='fight'||phase==='roundend'||phase==='countdown';
+  if (inFight) {
+    const rect = canvas.getBoundingClientRect();
+    const ex = (e.clientX - rect.left) * (W / rect.width);
+    const ey = (e.clientY - rect.top)  * (H / rect.height);
+    if (ex>=EXIT_BTN.x&&ex<=EXIT_BTN.x+EXIT_BTN.w&&ey>=EXIT_BTN.y&&ey<=EXIT_BTN.y+EXIT_BTN.h) {
+      exitToMenu(); return;
+    }
+  }
   if (phase === 'intro') { keys['Enter'] = true; return; }
   if (phase === 'modeselect') {
     const rect = canvas.getBoundingClientRect();
@@ -1492,6 +1508,11 @@ let gameMode='cpu'; // 'cpu' or '2p'
 let modeSelectStep=0; // 0=モード選択, 1=難易度選択(CPUのみ)
 let cpuDifficulty='normal'; // 'weak', 'normal', 'strong'
 function showFlash(msg,dur){flash.msg=msg;flash.t=dur;}
+function exitToMenu(){
+  wins=[0,0]; roundNum=1; selectStep=0; modeSelectStep=0;
+  phase='modeselect';
+  try{beep(300,'sine',0.08);}catch(e){}
+}
 
 function startRound() {
   const p1def=CHAR_LIST[selectedCharIdx];
@@ -1650,6 +1671,7 @@ function loop() {
   drawHUD();
   drawFlashMsg();
   drawSpecialBanner();
+  drawExitButton();
   if (!IS_TOUCH) {
     ctx.fillStyle='rgba(255,255,255,0.25)'; ctx.font='11px monospace'; ctx.textAlign='center';
     ctx.fillText('A/D 移動  W ジャンプ  S しゃがみ  J パンチ  K キック  L ガード  Space 必殺技',W/2,H-8);
@@ -1659,6 +1681,15 @@ function loop() {
   if (IS_TOUCH && gameMode === '2p') {
     drawMobile2PControls();
   }
+}
+
+function drawExitButton() {
+  ctx.fillStyle='rgba(0,0,0,0.6)';
+  ctx.fillRect(EXIT_BTN.x,EXIT_BTN.y,EXIT_BTN.w,EXIT_BTN.h);
+  ctx.fillStyle='#ff6666';
+  ctx.font='bold 13px sans-serif';
+  ctx.textAlign='left';
+  ctx.fillText('■ 終了',EXIT_BTN.x+5,EXIT_BTN.y+17);
 }
 
 function drawP2KeyHint() {
@@ -2022,6 +2053,22 @@ if (location.search.includes('test')) {
     const btns = getMobile2PButtons();
     const p2btns = btns.filter(b => b.player === 2);
     p2btns.forEach(b => { if (b.cx < 400) throw new Error(`P2 button cx=${b.cx} must be >= 400`); });
+  });
+
+  t('EXIT_BTN: 定数が存在する', () => {
+    if (typeof EXIT_BTN === 'undefined') throw new Error('EXIT_BTN not defined');
+    if (typeof EXIT_BTN.x !== 'number') throw new Error('EXIT_BTN.x missing');
+    if (EXIT_BTN.w <= 0) throw new Error('EXIT_BTN.w must be positive');
+  });
+
+  t('drawExitButton: 関数が存在する', () => {
+    if (typeof drawExitButton !== 'function') throw new Error('drawExitButton function not found');
+  });
+
+  t('exitToMenu: 実行するとphaseがmodeselectになる', () => {
+    phase = 'fight';
+    exitToMenu();
+    if (phase !== 'modeselect') throw new Error(`phase=${phase}, expected modeselect`);
   });
 
   // ---- 実行 ----
