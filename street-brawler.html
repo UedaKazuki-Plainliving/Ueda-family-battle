@@ -1780,6 +1780,7 @@ function initMobile2PTouch() {
   }
 
   function handleTouch(e) {
+    if (gameMode !== '2p') return; // 1P mode: HTML buttons handle input
     e.preventDefault();
     const buttons = getButtons();
     // Reset all button keys
