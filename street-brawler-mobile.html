@@ -205,57 +205,57 @@ if (IS_TOUCH) {
 // ---- Character Definitions ----
 const CHARS = {
   icchi: {
-    id:'icchi', name:'いっちー', c1:'#00ccee', c2:'#ffffff',
+    id:'icchi', name:'いっちー', c1:'#00ccee', c2:'#1155cc',
     walkSpd:6.5, jumpVel:-21, gravity:0.70,
     punchDmg:5, kickDmg:8, jatkDmg:10,
     punchDur:10, kickDur:28, jatkDur:13,
     punchS:2, punchE:8, kickS:5, kickE:18, jatkS:3, jatkE:12,
     rangeBonus:1.0, hitStunGiven:16, pushback:12,
-    scale:0.70, limbW:5, bodyW:15, hairStyle:'spiky',
+    scale:0.70, limbW:5, bodyW:15, hairStyle:'bobboy',
     specialName:'ドラゴンソード', desc:'スピードタイプ',
     flavor:['動きが速い！','攻撃連打が得意','パワーは低め'],
   },
   yuuri: {
-    id:'yuuri', name:'ゆうり', c1:'#dd3300', c2:'#ff6644',
+    id:'yuuri', name:'ゆうり', c1:'#eeeeee', c2:'#dddddd',
     walkSpd:2.5, jumpVel:-14, gravity:0.92,
     punchDmg:16, kickDmg:24, jatkDmg:27,
     punchDur:26, kickDur:42, jatkDur:28,
     punchS:7, punchE:18, kickS:10, kickE:28, jatkS:6, jatkE:20,
     rangeBonus:1.0, hitStunGiven:30, pushback:28,
-    scale:1.08, limbW:11, bodyW:30, hairStyle:'longsporty',
+    scale:1.08, limbW:11, bodyW:32, hairStyle:'longbang',
     specialName:'ドロップキック', desc:'パワータイプ',
     flavor:['一撃が重い！','ガードが固い','スピードは遅め'],
   },
   soyo: {
-    id:'soyo', name:'そよ', c1:'#22cc44', c2:'#aaff88',
+    id:'soyo', name:'そよ', c1:'#f0f0f0', c2:'#223355',
     walkSpd:7.2, jumpVel:-24, gravity:0.63,
     punchDmg:4, kickDmg:7, jatkDmg:9,
     punchDur:10, kickDur:26, jatkDur:13,
     punchS:2, punchE:8, kickS:4, kickE:17, jatkS:2, jatkE:11,
     rangeBonus:1.5, hitStunGiven:14, pushback:9,
-    scale:0.93, limbW:6, bodyW:19, hairStyle:'stylish',
+    scale:0.93, limbW:6, bodyW:16, hairStyle:'longnofringe',
     specialName:'陸上こうげき', desc:'スピード/レンジ',
     flavor:['走り&ジャンプ最強！','攻撃レンジが広い','パワーは低め'],
   },
   otousan: {
-    id:'otousan', name:'おとうさん', c1:'#887755', c2:'#ccaa77',
+    id:'otousan', name:'おとうさん', c1:'#444455', c2:'#888899',
     walkSpd:2.0, jumpVel:-18, gravity:1.05,
     punchDmg:0, kickDmg:10, jatkDmg:12,
     punchDur:42, kickDur:48, jatkDur:32,
     punchS:18, punchE:18, kickS:12, kickE:28, jatkS:8, jatkE:18,
     punchIsProjectile:true, rangeBonus:1.0, hitStunGiven:22, pushback:14,
-    scale:1.20, limbW:7, bodyW:20, hairStyle:'cap',
+    scale:1.20, limbW:7, bodyW:20, hairStyle:'perm',
     specialName:'沢山しゃべる', desc:'飛び道具タイプ',
     flavor:['パンチ→野球ボール！','動きはかなり遅め','技の隙が大きい'],
   },
   okaasan: {
-    id:'okaasan', name:'おかあさん', c1:'#cc44aa', c2:'#ffbbdd',
+    id:'okaasan', name:'おかあさん', c1:'#ee44aa', c2:'#ff88cc',
     walkSpd:4.2, jumpVel:-17, gravity:0.80,
     punchDmg:9, kickDmg:14, jatkDmg:16,
     punchDur:17, kickDur:32, jatkDur:20,
     punchS:3, punchE:10, kickS:6, kickE:20, jatkS:4, jatkE:13,
     rangeBonus:1.0, hitStunGiven:20, pushback:16,
-    scale:1.02, limbW:9, bodyW:26, hairStyle:'longglasses',
+    scale:1.02, limbW:9, bodyW:26, hairStyle:'bobglasses',
     specialName:'ゴリラ攻撃', desc:'バランスタイプ',
     flavor:['万能バランス型','ゴリラ分身を召喚！','オールラウンダー'],
   },
@@ -879,7 +879,7 @@ class Fighter {
     ctx.fillStyle=c1; ctx.fillRect(-bw/2,bodyTop,bw,bodyH);
     ctx.fillStyle=c2; ctx.fillRect(-bw/2,beltY,bw,8);
     if (def.id==='otousan') {
-      ctx.fillStyle='#223355'; ctx.fillRect(-bw/2,bodyTop,bw,bodyH);
+      ctx.fillStyle=c1; ctx.fillRect(-bw/2,bodyTop,bw,bodyH);
       ctx.fillStyle='#ffffff'; ctx.fillRect(-4,bodyTop+2,8,bodyH-10);
       ctx.fillStyle=c2; ctx.fillRect(-bw/2,beltY,bw,8);
       ctx.fillStyle='#cc2211';
@@ -889,10 +889,12 @@ class Fighter {
       ctx.closePath(); ctx.fill();
     }
     if (def.id==='yuuri') {
-      ctx.fillStyle='rgba(255,255,255,0.2)';
+      ctx.fillStyle='rgba(180,180,180,0.25)';
+      ctx.fillRect(-bw/2,bodyTop,bw/2,bodyH);
+      ctx.fillStyle='rgba(255,255,255,0.15)';
       ctx.fillRect(-bw/2+2,bodyTop+2,5,bodyH-4); ctx.fillRect(bw/2-7,bodyTop+2,5,bodyH-4);
-      ctx.fillStyle='rgba(255,255,255,0.45)'; ctx.font='bold 12px sans-serif'; ctx.textAlign='center';
-      ctx.fillText('7',0,beltY-10);
+      ctx.fillStyle='rgba(100,100,100,0.5)'; ctx.font='bold 11px sans-serif'; ctx.textAlign='center';
+      ctx.fillText('ゆ',0,beltY-8);
     }
 
     ctx.lineWidth=lw; ctx.strokeStyle=c1;
@@ -948,6 +950,62 @@ class Fighter {
         ctx.beginPath(); ctx.moveTo(sx-4,hy-12); ctx.lineTo(sx,sy); ctx.lineTo(sx+4,hy-12); ctx.closePath(); ctx.fill();
       });
       ctx.fillStyle=c2; ctx.fillRect(-4,hy-13,8,4);
+    } else if (hs==='bobboy') {
+      // おかっぱ風の黒髪少年: 頭の丸に沿って黒髪がかぶさり、左右に少し垂れる
+      ctx.fillStyle='#111111';
+      ctx.beginPath(); ctx.arc(0,hy-8,14,Math.PI,0); ctx.fill();
+      // 左に垂れる髪
+      ctx.beginPath(); ctx.moveTo(-14,hy-8); ctx.bezierCurveTo(-18,hy-4,-18,hy+6,-14,hy+10);
+      ctx.lineTo(-10,hy+8); ctx.bezierCurveTo(-13,hy+4,-13,hy-3,-10,hy-9); ctx.closePath(); ctx.fill();
+      // 右に垂れる髪
+      ctx.beginPath(); ctx.moveTo(14,hy-8); ctx.bezierCurveTo(18,hy-4,18,hy+6,14,hy+10);
+      ctx.lineTo(10,hy+8); ctx.bezierCurveTo(13,hy+4,13,hy-3,10,hy-9); ctx.closePath(); ctx.fill();
+      // 前髪帯
+      ctx.fillRect(-14,hy-12,28,7);
+    } else if (hs==='longbang') {
+      // 茶色の長い髪+前髪: ゆうり
+      ctx.fillStyle='#aa7744';
+      ctx.beginPath(); ctx.moveTo(-13,hy-16); ctx.bezierCurveTo(-24,hy-2,-26,hy+22,-18,hy+50);
+      ctx.lineTo(-12,hy+48); ctx.bezierCurveTo(-16,hy+20,-14,hy-2,-5,hy-17); ctx.closePath(); ctx.fill();
+      ctx.beginPath(); ctx.moveTo(11,hy-16); ctx.bezierCurveTo(22,hy,22,hy+20,14,hy+44);
+      ctx.lineTo(19,hy+44); ctx.bezierCurveTo(28,hy+16,28,hy-4,17,hy-18); ctx.closePath(); ctx.fill();
+      ctx.beginPath(); ctx.arc(0,hy-10,14,Math.PI,0); ctx.fill();
+      // 前髪（額にかかる）
+      ctx.beginPath(); ctx.moveTo(-14,hy-10); ctx.bezierCurveTo(-10,hy-2,-4,hy+2,0,hy+1);
+      ctx.bezierCurveTo(5,hy+2,10,hy-2,14,hy-8);
+      ctx.lineTo(11,hy-11); ctx.bezierCurveTo(7,hy-6,3,hy-2,0,hy-3);
+      ctx.bezierCurveTo(-3,hy-2,-8,hy-5,-12,hy-12); ctx.closePath(); ctx.fill();
+    } else if (hs==='longnofringe') {
+      // 黒の長い髪、前髪なし: そよ
+      ctx.fillStyle='#111111';
+      ctx.beginPath(); ctx.moveTo(-12,hy-18); ctx.bezierCurveTo(-22,hy-4,-24,hy+24,-16,hy+52);
+      ctx.lineTo(-10,hy+50); ctx.bezierCurveTo(-14,hy+22,-12,hy-2,-4,hy-19); ctx.closePath(); ctx.fill();
+      ctx.beginPath(); ctx.moveTo(10,hy-18); ctx.bezierCurveTo(20,hy-4,22,hy+20,14,hy+48);
+      ctx.lineTo(19,hy+48); ctx.bezierCurveTo(27,hy+16,25,hy-4,14,hy-20); ctx.closePath(); ctx.fill();
+      ctx.beginPath(); ctx.arc(0,hy-12,14,Math.PI,0); ctx.fill();
+      // 前髪なし: トップをしっかり覆う
+      ctx.fillRect(-14,hy-20,28,10);
+    } else if (hs==='bobglasses') {
+      // 黒髪ボブ: おかあさん
+      ctx.fillStyle='#111111';
+      ctx.beginPath(); ctx.moveTo(-14,hy-16); ctx.bezierCurveTo(-22,hy-4,-22,hy+14,-14,hy+18);
+      ctx.lineTo(-10,hy+16); ctx.bezierCurveTo(-16,hy+10,-16,hy-4,-10,hy-16); ctx.closePath(); ctx.fill();
+      ctx.beginPath(); ctx.moveTo(12,hy-16); ctx.bezierCurveTo(20,hy-4,20,hy+14,12,hy+18);
+      ctx.lineTo(8,hy+16); ctx.bezierCurveTo(14,hy+10,14,hy-4,8,hy-16); ctx.closePath(); ctx.fill();
+      ctx.beginPath(); ctx.arc(0,hy-10,14,Math.PI,0); ctx.fill();
+      ctx.fillRect(-14,hy-16,28,8);
+    } else if (hs==='perm') {
+      // 短め天然パーマ+前髪: おとうさん
+      ctx.fillStyle='#333322';
+      ctx.beginPath(); ctx.arc(0,hy-10,14,Math.PI,0); ctx.fill();
+      // カール風の丸みのある髪
+      const permSpots = [[-10,hy-22],[-4,hy-26],[4,hy-25],[10,hy-21],[14,hy-14]];
+      permSpots.forEach(([px,py]) => {
+        ctx.beginPath(); ctx.arc(px,py,4.5,0,Math.PI*2); ctx.fill();
+      });
+      // 前髪（下ろし気味）
+      ctx.beginPath(); ctx.moveTo(-14,hy-10); ctx.bezierCurveTo(-8,hy-4,0,hy-2,8,hy-6);
+      ctx.lineTo(6,hy-9); ctx.bezierCurveTo(0,hy-5,-7,hy-7,-12,hy-13); ctx.closePath(); ctx.fill();
     } else if (hs==='longsporty') {
       ctx.fillStyle=hc;
       ctx.beginPath(); ctx.moveTo(-13,hy-16); ctx.bezierCurveTo(-22,hy-2,-24,hy+20,-16,hy+44);
@@ -1000,6 +1058,20 @@ class Fighter {
       ctx.beginPath(); ctx.arc(-4,hy-3,4.5,0,Math.PI*2); ctx.stroke();
       ctx.beginPath(); ctx.moveTo(1.5,hy-3); ctx.lineTo(-0.5,hy-3); ctx.stroke();
       ctx.beginPath(); ctx.moveTo(10.5,hy-3); ctx.lineTo(14,hy-2); ctx.stroke();
+    } else if (hs==='bobglasses') {
+      // 丸眼鏡 (おかあさん): ピンク系フレーム
+      ctx.strokeStyle='#cc44aa'; ctx.lineWidth=1.8;
+      ctx.beginPath(); ctx.arc(6,hy-3,4.5,0,Math.PI*2); ctx.stroke();
+      ctx.beginPath(); ctx.arc(-4,hy-3,4.5,0,Math.PI*2); ctx.stroke();
+      ctx.beginPath(); ctx.moveTo(1.5,hy-3); ctx.lineTo(-0.5,hy-3); ctx.stroke();
+      ctx.beginPath(); ctx.moveTo(10.5,hy-3); ctx.lineTo(14,hy-2); ctx.stroke();
+    } else if (hs==='perm') {
+      // 黒フレームの眼鏡 (おとうさん)
+      ctx.strokeStyle='#222222'; ctx.lineWidth=2;
+      ctx.beginPath(); ctx.arc(6,hy-3,5,0,Math.PI*2); ctx.stroke();
+      ctx.beginPath(); ctx.arc(-4,hy-3,5,0,Math.PI*2); ctx.stroke();
+      ctx.beginPath(); ctx.moveTo(1,hy-3); ctx.lineTo(-0,hy-3); ctx.stroke();
+      ctx.beginPath(); ctx.moveTo(11,hy-3); ctx.lineTo(14,hy-2); ctx.stroke();
     }
   }
 
