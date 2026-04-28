@@ -107,6 +107,7 @@ document.addEventListener('keydown', e => {
   if (e.code === 'Escape') {
     const inFight = phase==='fight'||phase==='roundend'||phase==='countdown';
     if (inFight) { exitToMenu(); return; }
+    // intro/modeselect/charselect: treat Escape as Backspace (go back)
   }
   keys[e.code] = true; e.preventDefault();
 });
@@ -179,6 +180,19 @@ canvas.addEventListener('pointerdown', e => {
     }
   }
   if (phase === 'intro') { keys['Enter'] = true; return; }
+  if (phase === 'modeselect' || phase === 'charselect') {
+    const rect2 = canvas.getBoundingClientRect();
+    const bex = (e.clientX - rect2.left) * (W / rect2.width);
+    const bey = (e.clientY - rect2.top)  * (H / rect2.height);
+    if (bex >= 12 && bex <= 100 && bey >= H-42 && bey <= H-14) {
+      if (phase === 'charselect') {
+        if (selectStep === 1) { selectStep = 0; beep(300,'sine',0.08); return; }
+        modeSelectStep=0; phase='modeselect'; beep(300,'sine',0.08); return;
+      }
+      if (modeSelectStep === 1) { modeSelectStep=0; beep(300,'sine',0.08); return; }
+      phase='intro'; beep(300,'sine',0.08); return;
+    }
+  }
   if (phase === 'modeselect') {
     const rect = canvas.getBoundingClientRect();
     const scaleY = H / rect.height;
@@ -215,7 +229,8 @@ canvas.addEventListener('pointerdown', e => {
 if (IS_TOUCH) {
   setInterval(() => {
     const inFight = phase === 'fight' || phase === 'roundend' || phase === 'countdown';
-    document.getElementById('fight-ctrls').style.display = inFight ? 'block' : 'none';
+    // 2P mode uses canvas buttons, not HTML buttons
+    document.getElementById('fight-ctrls').style.display = (inFight && gameMode !== '2p') ? 'block' : 'none';
     document.getElementById('nav-ctrls').style.display   = inFight ? 'none'  : 'flex';
   }, 80);
 } else {
@@ -816,7 +831,10 @@ class Fighter {
     }
 
     this.x=Math.max(55,Math.min(W-55,this.x));
-    if (Math.abs(this.x-opp.x)<52) this.x+=this.dir*-2;
+    const MIN_DIST=54;
+    if (Math.abs(this.x-opp.x)<MIN_DIST) {
+      this.x = opp.x + (this.x>=opp.x ? MIN_DIST : -MIN_DIST);
+    }
   }
 
   draw() {
@@ -1448,6 +1466,15 @@ function drawIntro() {
   }
 }
 
+function drawBackBtn() {
+  ctx.fillStyle='rgba(255,255,255,0.08)';
+  ctx.fillRect(12, H-42, 88, 28);
+  ctx.strokeStyle='#555'; ctx.lineWidth=1;
+  ctx.strokeRect(12, H-42, 88, 28);
+  ctx.fillStyle='#aaa'; ctx.font='14px sans-serif'; ctx.textAlign='left';
+  ctx.fillText('◀ 戻る', 20, H-23);
+}
+
 function drawModeSelect() {
   ctx.fillStyle='#000'; ctx.fillRect(0,0,W,H);
   ctx.font='bold 36px sans-serif'; ctx.textAlign='center';
@@ -1474,6 +1501,7 @@ function drawModeSelect() {
       ctx.font='13px sans-serif'; ctx.fillStyle='#666'; ctx.textAlign='center';
       ctx.fillText('↑↓ / W/S で選択  　1:弱い  2:普通  3:強い  　Space / Enter で決定',W/2,440);
     }
+    drawBackBtn();
     return;
   }
 
@@ -1498,6 +1526,7 @@ function drawModeSelect() {
       ctx.fillText('P2操作: ←→↑↓ 移動  Num1 パンチ  Num2 キック  Num3 ガード  Num0 必殺技',W/2,422);
     }
   }
+  drawBackBtn();
 }
 
 function drawCharSelect() {
@@ -1507,6 +1536,7 @@ function drawCharSelect() {
   ctx.fillText(selectStep===0?'P1: キャラを選択':gameMode==='2p'?'P2: キャラを選択':'対戦相手を選択',W/2,38);
   ctx.font='13px sans-serif'; ctx.fillStyle='#888';
   ctx.fillText(IS_TOUCH ? 'タップして選択 / 決定で確定' : '← → で選択　　Space / Enter で決定',W/2,62);
+  drawBackBtn();
 
   const PW=136, PH=272, GAP=20, startX=20;
   CHAR_LIST.forEach((def,idx)=>{
@@ -1601,6 +1631,11 @@ function loop() {
   }
   if (phase==='modeselect') {
     drawModeSelect();
+    if (keyOnce('Backspace')||keyOnce('Escape')) {
+      if (modeSelectStep===1) { modeSelectStep=0; beep(300,'sine',0.08); }
+      else { phase='intro'; beep(300,'sine',0.08); }
+      return;
+    }
     if (modeSelectStep === 1) {
       // 難易度選択
       const diffs = ['weak','normal','strong'];
@@ -1625,6 +1660,11 @@ function loop() {
   }
   if (phase==='charselect') {
     drawCharSelect();
+    if (keyOnce('Backspace')||keyOnce('Escape')) {
+      if (selectStep===1) { selectStep=0; beep(300,'sine',0.08); }
+      else { modeSelectStep=0; phase='modeselect'; beep(300,'sine',0.08); }
+      return;
+    }
     if (keyOnce('ArrowLeft')||keyOnce('KeyA')) {
       if (selectStep===0) selectedCharIdx=(selectedCharIdx-1+CHAR_LIST.length)%CHAR_LIST.length;
       else cpuCharIdx=(cpuCharIdx-1+CHAR_LIST.length)%CHAR_LIST.length;
@@ -1784,12 +1824,15 @@ function initMobile2PTouch() {
     e.preventDefault();
     const buttons = getButtons();
     // Reset all button keys
-    buttons.forEach(b => { keys[b.key] = false; });
+    buttons.forEach(b => { keys[b.key] = false; if (b.key2) keys[b.key2] = false; });
     // Set keys for active touches
     for (let i = 0; i < e.touches.length; i++) {
       const coords = getCanvasCoords(e.touches[i]);
       buttons.forEach(b => {
-        if (hitTest(b, coords.x, coords.y)) keys[b.key] = true;
+        if (hitTest(b, coords.x, coords.y)) {
+          keys[b.key] = true;
+          if (b.key2) keys[b.key2] = true;
+        }
       });
     }
   }
@@ -1801,24 +1844,32 @@ function initMobile2PTouch() {
 }
 
 function getMobile2PButtons() {
-  const R = 30;
+  const R = 28;
   return [
-    // P1 controls (left half)
-    {cx:60,  cy:390, r:R, key:'KeyA',  player:1, label:'◀'},
-    {cx:130, cy:390, r:R, key:'KeyD',  player:1, label:'▶'},
-    {cx:95,  cy:350, r:R, key:'KeyW',  player:1, label:'▲'},
-    {cx:230, cy:360, r:R, key:'KeyJ',  player:1, label:'殴'},
-    {cx:290, cy:360, r:R, key:'KeyK',  player:1, label:'蹴'},
-    {cx:230, cy:410, r:R, key:'KeyL',  player:1, label:'ガ'},
-    {cx:290, cy:410, r:R, key:'Space', player:1, label:'必'},
-    // P2 controls (right half)
-    {cx:W-60,  cy:390, r:R, key:'ArrowRight', player:2, label:'▶'},
-    {cx:W-130, cy:390, r:R, key:'ArrowLeft',  player:2, label:'◀'},
-    {cx:W-95,  cy:350, r:R, key:'ArrowUp',    player:2, label:'▲'},
-    {cx:W-230, cy:360, r:R, key:'Numpad1',    player:2, label:'殴'},
-    {cx:W-290, cy:360, r:R, key:'Numpad2',    player:2, label:'蹴'},
-    {cx:W-230, cy:410, r:R, key:'Numpad3',    player:2, label:'ガ'},
-    {cx:W-290, cy:410, r:R, key:'Numpad0',    player:2, label:'必'},
+    // P1 d-pad (left half)
+    {cx:55,  cy:355, r:R, key:'KeyW', key2:'KeyA', player:1, label:'↖'},
+    {cx:95,  cy:340, r:R, key:'KeyW',              player:1, label:'▲'},
+    {cx:135, cy:355, r:R, key:'KeyW', key2:'KeyD', player:1, label:'↗'},
+    {cx:60,  cy:395, r:R, key:'KeyA',              player:1, label:'◀'},
+    {cx:130, cy:395, r:R, key:'KeyD',              player:1, label:'▶'},
+    {cx:95,  cy:430, r:R, key:'KeyS',              player:1, label:'▼'},
+    // P1 action buttons
+    {cx:225, cy:358, r:R, key:'KeyJ',  player:1, label:'殴'},
+    {cx:285, cy:358, r:R, key:'KeyK',  player:1, label:'蹴'},
+    {cx:225, cy:415, r:R, key:'KeyL',  player:1, label:'ガ'},
+    {cx:285, cy:415, r:R, key:'Space', player:1, label:'必'},
+    // P2 d-pad (right half)
+    {cx:W-55,  cy:355, r:R, key:'ArrowUp', key2:'ArrowRight', player:2, label:'↗'},
+    {cx:W-95,  cy:340, r:R, key:'ArrowUp',                    player:2, label:'▲'},
+    {cx:W-135, cy:355, r:R, key:'ArrowUp', key2:'ArrowLeft',  player:2, label:'↖'},
+    {cx:W-60,  cy:395, r:R, key:'ArrowRight', player:2, label:'▶'},
+    {cx:W-130, cy:395, r:R, key:'ArrowLeft',  player:2, label:'◀'},
+    {cx:W-95,  cy:430, r:R, key:'ArrowDown',  player:2, label:'▼'},
+    // P2 action buttons
+    {cx:W-225, cy:358, r:R, key:'Numpad1', player:2, label:'殴'},
+    {cx:W-285, cy:358, r:R, key:'Numpad2', player:2, label:'蹴'},
+    {cx:W-225, cy:415, r:R, key:'Numpad3', player:2, label:'ガ'},
+    {cx:W-285, cy:415, r:R, key:'Numpad0', player:2, label:'必'},
   ];
 }
 
