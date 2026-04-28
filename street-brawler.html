@@ -259,7 +259,7 @@ const CHARS = {
     punchS:2, punchE:8, kickS:5, kickE:18, jatkS:3, jatkE:12,
     rangeBonus:1.0, hitStunGiven:16, pushback:12,
     scale:0.70, limbW:5, bodyW:15, hairStyle:'bobboy',
-    specialName:'ドラゴンソード', desc:'スピードタイプ',
+    specialName:'ドラゴンソード', superName:'アイスドラゴン召喚', desc:'スピードタイプ',
     flavor:['動きが速い！','攻撃連打が得意','パワーは低め'],
   },
   yuuri: {
@@ -270,7 +270,7 @@ const CHARS = {
     punchS:7, punchE:18, kickS:10, kickE:28, jatkS:6, jatkE:20,
     rangeBonus:1.0, hitStunGiven:30, pushback:28,
     scale:1.08, limbW:11, bodyW:32, hairStyle:'longbang',
-    specialName:'ドロップキック', desc:'パワータイプ',
+    specialName:'ドロップキック', superName:'ゴールデンフェニックス', desc:'パワータイプ',
     flavor:['一撃が重い！','ガードが固い','スピードは遅め'],
   },
   soyo: {
@@ -281,7 +281,7 @@ const CHARS = {
     punchS:2, punchE:8, kickS:4, kickE:17, jatkS:2, jatkE:11,
     rangeBonus:1.5, hitStunGiven:14, pushback:9,
     scale:0.93, limbW:6, bodyW:16, hairStyle:'longnofringe',
-    specialName:'陸上こうげき', desc:'スピード/レンジ',
+    specialName:'陸上こうげき', superName:'100m居合い切り', desc:'スピード/レンジ',
     flavor:['走り&ジャンプ最強！','攻撃レンジが広い','パワーは低め'],
   },
   otousan: {
@@ -292,7 +292,7 @@ const CHARS = {
     punchS:18, punchE:18, kickS:12, kickE:28, jatkS:8, jatkE:18,
     punchIsProjectile:true, rangeBonus:1.0, hitStunGiven:22, pushback:14,
     scale:1.20, limbW:7, bodyW:20, hairStyle:'perm',
-    specialName:'沢山しゃべる', desc:'飛び道具タイプ',
+    specialName:'沢山しゃべる', superName:'ブラックホール', desc:'飛び道具タイプ',
     flavor:['パンチ→野球ボール！','動きはかなり遅め','技の隙が大きい'],
   },
   okaasan: {
@@ -303,7 +303,7 @@ const CHARS = {
     punchS:3, punchE:10, kickS:6, kickE:20, jatkS:4, jatkE:13,
     rangeBonus:1.0, hitStunGiven:20, pushback:16,
     scale:1.02, limbW:9, bodyW:26, hairStyle:'bobglasses',
-    specialName:'ゴリラ攻撃', desc:'バランスタイプ',
+    specialName:'ゴリラ攻撃', superName:'歌うたい攻撃', desc:'バランスタイプ',
     flavor:['万能バランス型','ゴリラ分身を召喚！','オールラウンダー'],
   },
 };
@@ -373,6 +373,11 @@ function triggerSpecialFlash(def) {
   screenFlash = {t:14, color: def.c1};
   specialBanner = {name: def.specialName, color: def.c1, t:90};
 }
+function triggerSuperFlash(def) {
+  screenFlash = {t:22, color: '#ffffff'};
+  specialBanner = {name: '超必殺！'+def.superName, color: def.c1, t:110};
+  beep(800,'sawtooth',0.3,0.5); setTimeout(()=>beep(1200,'square',0.22,0.4),100);
+}
 
 function drawScreenFlash() {
   if (screenFlash.t<=0) return;
@@ -428,13 +433,15 @@ function updateProjectiles(p1,p2) {
   for (let i=projectiles.length-1;i>=0;i--) {
     const proj=projectiles[i];
     proj.x+=proj.vx;
-    if (--proj.t<=0||proj.x<-90||proj.x>W+90){projectiles.splice(i,1);continue;}
+    if (proj.vy!==undefined){proj.vy+=0.06;proj.y+=proj.vy;}
+    if (--proj.t<=0||proj.x<-100||proj.x>W+100){projectiles.splice(i,1);continue;}
     const target=proj.owner===p1?p2:p1;
     if (target.hp<=0||target.hitStun>0) continue;
     const hurt=target.hurtbox();
     const px=proj.vx>0?proj.x-5:proj.x-65;
     if (px<hurt.x+hurt.w&&px+70>hurt.x&&proj.y-20<hurt.y+hurt.h&&proj.y+20>hurt.y) {
       if (target.takeHit({dmg:proj.dmg,stun:proj.stun,push:proj.push,type:'special'},proj.vx>0?1:-1)) {
+        if (proj.type==='ice') target.frozenFrames=Math.max(target.frozenFrames,140);
         proj.owner.specialGauge=Math.min(proj.owner.maxSpecialGauge,proj.owner.specialGauge+20);
         spawnHit(target.x,target.y-70);
         projectiles.splice(i,1);
@@ -490,6 +497,25 @@ function drawProjectiles() {
   projectiles.forEach(p => {
     if (p.type==='dragon') drawDragonSword(p.x,p.y,p.vx>0?1:-1);
     else if (p.type==='baseball') drawBaseball(p.x,p.y);
+    else if (p.type==='note') {
+      ctx.save(); ctx.globalAlpha=Math.min(1,p.t/12);
+      ctx.font='bold 20px serif'; ctx.textAlign='center';
+      ctx.fillStyle=p.color||'#ff88ff';
+      ctx.fillText(p.note,p.x,p.y); ctx.globalAlpha=1; ctx.restore();
+    } else if (p.type==='hoge') {
+      ctx.save(); ctx.globalAlpha=Math.min(1,p.t/12);
+      ctx.font='bold 38px sans-serif'; ctx.textAlign='center';
+      ctx.strokeStyle='#000'; ctx.lineWidth=4;
+      ctx.strokeText('ほげー',p.x,p.y);
+      ctx.fillStyle='#ff44bb'; ctx.fillText('ほげー',p.x,p.y);
+      ctx.globalAlpha=1; ctx.restore();
+    } else if (p.type==='ice') {
+      ctx.save(); ctx.globalAlpha=0.88;
+      ctx.fillStyle='#88eeff'; ctx.strokeStyle='#00aaff'; ctx.lineWidth=2;
+      ctx.beginPath(); ctx.rect(p.x-18,p.y-13,36,26); ctx.fill(); ctx.stroke();
+      ctx.fillStyle='#003355'; ctx.font='bold 14px sans-serif'; ctx.textAlign='center';
+      ctx.fillText('❄',p.x,p.y+5); ctx.globalAlpha=1; ctx.restore();
+    }
   });
 }
 
@@ -582,6 +608,8 @@ function drawWords() {
 
 // ---- Gorilla (おかあさん special) ----
 let activeGorilla = null;
+let activeDragon = null;
+let activeBlackHole = null;
 class Gorilla {
   constructor(owner, target) {
     this.x=owner.x+owner.dir*50; this.y=GROUND; this.vy=0;
@@ -654,6 +682,139 @@ class Gorilla {
   }
 }
 
+// ---- IceDragon (いっちー super) ----
+class IceDragon {
+  constructor(owner,target){
+    this.owner=owner; this.target=target;
+    this.x=owner.x+owner.dir*70; this.y=GROUND-55;
+    this.dir=owner.dir; this.t=220; this.shotTimer=30; this.shotCount=0;
+  }
+  update(){
+    if(--this.t<=0){activeDragon=null;return;}
+    const dx=this.target.x-this.x;
+    if(Math.abs(dx)>90) this.x+=Math.sign(dx)*3.5;
+    this.dir=dx>0?1:-1;
+    if(--this.shotTimer<=0&&this.shotCount<3){
+      this.shotTimer=38; this.shotCount++;
+      projectiles.push({type:'ice',x:this.x+this.dir*42,y:this.y-18,
+        vx:this.dir*10,vy:0,owner:this.owner,t:85,dmg:15,stun:8,push:5});
+      beep(220,'sine',0.18,0.18);
+    }
+  }
+  draw(){
+    if(this.t<=0)return;
+    if(this.t<70&&Math.floor(this.t/5)%2===0)return;
+    ctx.save(); ctx.translate(this.x,this.y);
+    if(this.dir===-1) ctx.scale(-1,1);
+    // Body
+    ctx.fillStyle='#0077cc';
+    ctx.beginPath(); ctx.ellipse(0,-10,30,17,0,0,Math.PI*2); ctx.fill();
+    ctx.fillStyle='#22aaee';
+    ctx.beginPath(); ctx.ellipse(0,-10,23,12,0,0,Math.PI*2); ctx.fill();
+    // Head
+    ctx.fillStyle='#005599';
+    ctx.beginPath(); ctx.ellipse(36,-16,22,15,0.12,0,Math.PI*2); ctx.fill();
+    ctx.fillStyle='#0099dd';
+    ctx.beginPath(); ctx.ellipse(36,-16,15,10,0.12,0,Math.PI*2); ctx.fill();
+    // Eye
+    ctx.fillStyle='#fff'; ctx.beginPath(); ctx.arc(43,-20,4,0,Math.PI*2); ctx.fill();
+    ctx.fillStyle='#ff0'; ctx.beginPath(); ctx.arc(44,-20,2.5,0,Math.PI*2); ctx.fill();
+    // Wings
+    ctx.fillStyle='rgba(0,150,255,0.45)';
+    ctx.beginPath(); ctx.moveTo(0,-20); ctx.lineTo(-22,-58); ctx.lineTo(-6,-22); ctx.fill();
+    ctx.beginPath(); ctx.moveTo(10,-20); ctx.lineTo(32,-58); ctx.lineTo(19,-22); ctx.fill();
+    // Tail
+    ctx.lineWidth=9; ctx.strokeStyle='#0066aa'; ctx.lineCap='round';
+    ctx.beginPath(); ctx.moveTo(-26,-10); ctx.quadraticCurveTo(-52,2,-48,-26); ctx.stroke();
+    // Ice aura pulse
+    const pulse=0.25+0.18*Math.sin(Date.now()/140);
+    ctx.globalAlpha=pulse; ctx.fillStyle='#aaeeff';
+    ctx.beginPath(); ctx.ellipse(0,-10,42,24,0,0,Math.PI*2); ctx.fill();
+    ctx.globalAlpha=1;
+    ctx.restore();
+    // HP bar
+    const bp=this.t/220;
+    ctx.fillStyle='#111'; ctx.fillRect(this.x-24,this.y-95,48,5);
+    ctx.fillStyle=bp>0.5?'#44aaff':'#2266aa';
+    ctx.fillRect(this.x-24,this.y-95,48*bp,5);
+    ctx.fillStyle='#aaeeff'; ctx.font='bold 9px sans-serif'; ctx.textAlign='center';
+    ctx.fillText('アイスドラゴン',this.x,this.y-98);
+  }
+}
+
+// ---- BlackHole (おとうさん super) ----
+class BlackHole {
+  constructor(owner,target){
+    this.owner=owner; this.target=target;
+    this.x=target.x+(owner.x<target.x?25:-25);
+    this.y=target.y-75; this.t=180; this.r=0; this.hit=false;
+  }
+  update(p1,p2){
+    if(--this.t<=0||this.hit){activeBlackHole=null;return;}
+    this.r=Math.min(48,this.r+0.38);
+    const target=this.owner===p1?p2:p1;
+    const dx=this.x-target.x, dy=this.y-target.y;
+    const dist=Math.sqrt(dx*dx+dy*dy);
+    if(dist<this.r+28){
+      const dir=target.x>=this.x?1:-1;
+      if(target.takeHit({dmg:62,stun:70,push:0,type:'special',knockdown:true},dir)){
+        spawnHit(this.x,this.y);
+        target.vy=-15; target.onGround=false; target.airVx=dir*14;
+        this.hit=true; activeBlackHole=null;
+      }
+      return;
+    }
+    if(dist<220&&!target.hitStun&&!target.frozenFrames&&target.state!=='super'){
+      const pull=0.85*(1-dist/220);
+      target.x+=dx/dist*pull;
+    }
+  }
+  draw(){
+    if(!this.r||this.hit)return;
+    const cx=this.x, cy=this.y, now=Date.now();
+    ctx.save();
+    ctx.globalAlpha=0.4+0.2*Math.sin(now/110);
+    ctx.strokeStyle='#9900ff'; ctx.lineWidth=3;
+    ctx.beginPath(); ctx.arc(cx,cy,this.r+20,0,Math.PI*2); ctx.stroke();
+    ctx.globalAlpha=0.65; ctx.strokeStyle='#ff00ff'; ctx.lineWidth=2;
+    ctx.beginPath(); ctx.arc(cx,cy,this.r+7,0,Math.PI*2); ctx.stroke();
+    ctx.globalAlpha=1;
+    const g=ctx.createRadialGradient(cx,cy,0,cx,cy,this.r);
+    g.addColorStop(0,'rgba(0,0,0,1)');
+    g.addColorStop(0.5,'rgba(40,0,70,0.92)');
+    g.addColorStop(1,'rgba(0,0,0,0)');
+    ctx.fillStyle=g;
+    ctx.beginPath(); ctx.arc(cx,cy,this.r,0,Math.PI*2); ctx.fill();
+    ctx.strokeStyle='rgba(180,0,255,0.55)'; ctx.lineWidth=1.5; ctx.globalAlpha=0.7;
+    for(let i=0;i<3;i++){
+      const ang=now/180+i*(Math.PI*2/3);
+      ctx.beginPath(); ctx.arc(cx,cy,this.r*0.65,ang,ang+Math.PI*0.75); ctx.stroke();
+    }
+    ctx.globalAlpha=1; ctx.restore();
+    ctx.fillStyle='#cc44ff'; ctx.font='bold 10px sans-serif'; ctx.textAlign='center';
+    ctx.fillText('ブラックホール',cx,cy-this.r-10);
+  }
+}
+
+// ---- Note/Hoge projectiles (おかあさん super) ----
+function spawnNoteProj(owner,opp){
+  const notes=['♩','♪','♫','♬'];
+  projectiles.push({type:'note',
+    x:owner.x+owner.dir*28,y:owner.y-88-Math.random()*22,
+    vx:owner.dir*(9+Math.random()*4),vy:-0.5+Math.random()*1,
+    owner,t:65,dmg:7,stun:12,push:8,
+    note:notes[Math.floor(Math.random()*notes.length)],
+    color:`hsl(${Math.floor(Math.random()*360)},90%,70%)`});
+  beep(500+Math.random()*600,'sine',0.06,0.1);
+}
+function spawnHogeProj(owner,opp){
+  projectiles.push({type:'hoge',
+    x:owner.x+owner.dir*32,y:owner.y-82,
+    vx:owner.dir*8.5,vy:0,
+    owner,t:90,dmg:28,stun:22,push:28});
+  beep(180,'sawtooth',0.32,0.45);
+}
+
 // ---- Fighter ----
 class Fighter {
   constructor(x,facingRight,def) {
@@ -665,6 +826,8 @@ class Fighter {
     this.atkHit=false; this.af=0; this.atick=0;
     this.specialGauge=0; this.maxSpecialGauge=100;
     this.specialVx=0; this.specialFired=false;
+    this.superFired=false; this.superPhase=0; this.superTargetX=0; this.superOriginX=0; this.superHitActive=0;
+    this.frozenFrames=0; this.dmgDebuff=0;
     this.punchFired=false; this.guardFlash=0; this.guardMode=false;
     this.comboCount=0; this.invincFrames=0;
   }
@@ -677,6 +840,10 @@ class Fighter {
     const d=this.dir,s=this.def.scale,def=this.def,rb=def.rangeBonus??1;
     if (this.state==='special'&&def.id==='yuuri')
       return {x:this.x+d*8,y:this.y-88*s,w:d*95*s,h:58*s};
+    if (this.state==='super'&&def.id==='yuuri'&&this.superPhase===1)
+      return {x:this.x-40*s,y:this.y-55*s,w:80*s,h:55*s};
+    if (this.state==='super'&&def.id==='soyo'&&this.superHitActive>0&&!this.atkHit)
+      return {x:this.x-45*s,y:this.y-135*s,w:90*s,h:135*s};
     if (this.state==='punch'&&!def.punchIsProjectile&&this.st>=def.punchS&&this.st<=def.punchE)
       return {x:this.x+d*14*s,y:this.y-92*s,w:d*40*s*rb,h:26*s};
     if (this.state==='kick'&&this.st>=def.kickS&&this.st<=def.kickE)
@@ -689,15 +856,20 @@ class Fighter {
   }
   damageInfo() {
     const def=this.def;
-    if (this.state==='special'&&def.id==='yuuri') return {dmg:35,stun:42,push:60,type:'special'};
-    if (this.state==='punch') return {dmg:def.punchDmg,stun:def.hitStunGiven,push:def.pushback,type:'punch'};
-    if (this.state==='kick')  return {dmg:def.kickDmg, stun:def.hitStunGiven,push:def.pushback,type:'kick'};
-    if (this.state==='jatk')  return {dmg:def.jatkDmg, stun:def.hitStunGiven,push:def.pushback,type:'jatk'};
-    if (this.state==='jkick') return {dmg:def.kickDmg, stun:def.hitStunGiven,push:def.pushback,type:'jkick'};
-    return null;
+    let info=null;
+    if (this.state==='super'&&def.id==='yuuri'&&this.superPhase===1) info={dmg:55,stun:60,push:12,type:'special',knockdown:true};
+    else if (this.state==='super'&&def.id==='soyo') info={dmg:45,stun:50,push:20,type:'special'};
+    else if (this.state==='special'&&def.id==='yuuri') info={dmg:35,stun:42,push:60,type:'special'};
+    else if (this.state==='punch') info={dmg:def.punchDmg,stun:def.hitStunGiven,push:def.pushback,type:'punch'};
+    else if (this.state==='kick')  info={dmg:def.kickDmg, stun:def.hitStunGiven,push:def.pushback,type:'kick'};
+    else if (this.state==='jatk')  info={dmg:def.jatkDmg, stun:def.hitStunGiven,push:def.pushback,type:'jatk'};
+    else if (this.state==='jkick') info={dmg:def.kickDmg, stun:def.hitStunGiven,push:def.pushback,type:'jkick'};
+    if (!info) return null;
+    if (this.dmgDebuff>0) info={...info,dmg:Math.floor(info.dmg*0.55)};
+    return info;
   }
   takeHit(info,fromDir) {
-    if (this.state==='special') return false;
+    if (this.state==='special'||this.state==='super') return false;
     if (this.state==='down'||this.state==='downrise') return false;
     if (this.invincFrames>0) return false;
     if (this.hitStun>0||this.state==='dead') return false;
@@ -717,6 +889,15 @@ class Fighter {
       this.blockStun=10; this.guardFlash=9;
       beep(75,'sine',0.22,0.2);
       if (this.hp<=0){this.hp=0;this.state='dead';} return true;
+    }
+    if (info.knockdown) {
+      const nw=(this.x<80||this.x>720);
+      if (!nw) this.x+=fromDir*info.push;
+      else { const att=typeof fighters!=='undefined'&&(fighters[0]===this?fighters[1]:fighters[0]); if(att) att.x-=att.dir*40; }
+      this.hp=Math.max(0,this.hp-info.dmg);
+      if(this.hp<=0){this.hp=0;this.state='dead';}
+      else {this.state='down';this.st=0;this.dmgDebuff=180;}
+      this.comboCount=0; return true;
     }
     this.comboCount++;
     let push=info.push;
@@ -766,6 +947,61 @@ class Fighter {
       return;
     }
 
+    if (this.dmgDebuff>0) this.dmgDebuff--;
+    if (this.frozenFrames>0) {
+      this.frozenFrames--;
+      if (!this.onGround){
+        this.vy+=this.def.gravity;this.y+=this.vy;
+        if(this.y>=GROUND){this.y=GROUND;this.vy=0;this.onGround=true;this.airVx=0;
+          if(this.state==='jump'||this.state==='jatk'||this.state==='jkick'){this.state='idle';this.st=0;}}
+      }
+      return;
+    }
+
+    if (this.state==='super') {
+      const id=this.def.id;
+      if (id==='yuuri') {
+        this.vy+=this.def.gravity*0.65;this.y+=this.vy;
+        if (this.superPhase===0&&this.vy>=2){
+          this.superPhase=1;this.airVx=this.dir*12;this.vy=22;
+          beep(350,'sawtooth',0.22,0.35);
+        }
+        this.x+=this.airVx;
+        if (this.y>=GROUND){this.y=GROUND;this.vy=0;this.onGround=true;this.airVx=0;this.state='idle';this.st=0;this.superPhase=0;}
+        this.x=Math.max(40,Math.min(W-40,this.x));
+      } else if (id==='soyo') {
+        if (this.superHitActive>0) this.superHitActive--;
+        const SPEED=22;
+        if (this.superPhase===0){
+          const dx=this.superTargetX-this.x;
+          if (Math.abs(dx)<=SPEED){
+            this.x=this.superTargetX;this.superPhase=1;this.superHitActive=12;this.atkHit=false;
+            beep(900,'sawtooth',0.18,0.12);
+          } else this.x+=Math.sign(dx)*SPEED;
+        } else {
+          const dx=this.superOriginX-this.x;
+          if (Math.abs(dx)<=SPEED){this.x=this.superOriginX;this.state='idle';this.st=0;this.superPhase=0;}
+          else this.x+=Math.sign(dx)*SPEED;
+        }
+        this.x=Math.max(55,Math.min(W-55,this.x));
+      } else if (id==='okaasan') {
+        const noteFrames=[5,10,15,20,25];
+        if (noteFrames.includes(this.st)) spawnNoteProj(this,opp);
+        if (this.st===35) spawnHogeProj(this,opp);
+        if (this.st>=52){this.state='idle';this.st=0;}
+      } else {
+        // icchi, otousan: エンティティ召喚
+        if (!this.superFired&&this.st===1){
+          this.superFired=true;
+          if (id==='icchi') activeDragon=new IceDragon(this,opp);
+          else if (id==='otousan') activeBlackHole=new BlackHole(this,opp);
+        }
+        if (this.st>=(id==='icchi'?22:18)){this.state='idle';this.st=0;}
+      }
+      if (this.hitStun===0) this.dir=opp.x>this.x?1:-1;
+      return;
+    }
+
     if (this.state==='special') {
       const id=this.def.id;
       if (id==='yuuri') {
@@ -779,10 +1015,10 @@ class Fighter {
         if (id==='otousan') {
           // 3連続ことば: fireFrame, fireFrame+15, fireFrame+30
           if ((this.st===fireFrame||this.st===fireFrame+15||this.st===fireFrame+30)&&!this.specialFired) {
-            this.specialFired=true; if(this.st===fireFrame) this.specialGauge=0;
+            this.specialFired=true;
           }
         } else {
-          if (this.st===fireFrame&&!this.specialFired){this.specialFired=true;this.specialGauge=0;}
+          if (this.st===fireFrame&&!this.specialFired){this.specialFired=true;}
         }
         if (this.st>=endFrame){this.state='idle';this.st=0;}
       }
@@ -814,10 +1050,20 @@ class Fighter {
 
     const ok=this.blockStun===0;
 
-    if (ok&&inp.special&&this.specialGauge>=this.maxSpecialGauge&&this.onGround) {
-      this.state='special';this.st=0;this.specialFired=false;this.punchFired=false;
-      if (this.def.id==='yuuri'){this.specialVx=this.dir*14;this.vy=-8;this.onGround=false;this.specialGauge=0;}
-      triggerSpecialFlash(this.def);
+    if (ok&&inp.special&&this.specialGauge>=Math.floor(this.maxSpecialGauge/3)&&this.onGround) {
+      if (this.specialGauge>=this.maxSpecialGauge) {
+        // 超必殺技
+        this.state='super';this.st=0;this.superFired=false;this.atkHit=false;this.specialGauge=0;
+        if (this.def.id==='yuuri'){this.vy=-26;this.onGround=false;this.superPhase=0;this.airVx=0;}
+        else if (this.def.id==='soyo'){this.superPhase=0;this.superTargetX=opp.x;this.superOriginX=this.x;this.superHitActive=0;}
+        triggerSuperFlash(this.def);
+      } else {
+        // 通常必殺技（ゲージ1/3消費）
+        this.state='special';this.st=0;this.specialFired=false;this.punchFired=false;
+        this.specialGauge=Math.max(0,this.specialGauge-Math.floor(this.maxSpecialGauge/3));
+        if (this.def.id==='yuuri'){this.specialVx=this.dir*14;this.vy=-8;this.onGround=false;}
+        triggerSpecialFlash(this.def);
+      }
       return;
     }
 
@@ -856,6 +1102,65 @@ class Fighter {
       ctx.fillStyle=this.def.c1; ctx.font='bold 13px sans-serif'; ctx.textAlign='center';
       ctx.fillText(this.def.name,this.x,this.y-30); return;
     }
+    // --- 超必殺ビジュアル ---
+    if (this.state==='super'&&this.def.id==='yuuri') {
+      const s=this.def.scale;
+      if (this.superPhase===0) {
+        const pulse=0.55+0.35*Math.sin(Date.now()/60);
+        ctx.save(); ctx.globalAlpha=pulse*0.6; ctx.fillStyle='#ffaa00';
+        ctx.shadowBlur=40; ctx.shadowColor='#ffdd00';
+        ctx.beginPath(); ctx.arc(this.x,this.y-70*s,55*s,0,Math.PI*2); ctx.fill();
+        ctx.globalAlpha=1; ctx.shadowBlur=0; ctx.restore();
+      }
+      ctx.save(); ctx.translate(this.x,this.y-35*s);
+      if (this.dir===-1) ctx.scale(-1,1); ctx.rotate(-0.42);
+      ctx.scale(s,s);
+      ctx.strokeStyle=this.superPhase===0?'rgba(255,200,0,0.7)':'rgba(255,160,0,0.85)'; ctx.lineWidth=4;
+      for(let i=0;i<8;i++){const ly=-18+i*10;ctx.globalAlpha=(8-i)/8*0.8;
+        ctx.beginPath();ctx.moveTo(-100-i*12,ly);ctx.lineTo(-58,ly);ctx.stroke();}
+      ctx.globalAlpha=1;
+      this._shapeDropkick(); ctx.restore();
+      ctx.fillStyle='#ffdd00'; ctx.font='bold 12px sans-serif'; ctx.textAlign='center';
+      ctx.fillText(this.superPhase===0?'↑PHOENIX':this.def.name,this.x,this.y-(158*s)); return;
+    }
+    if (this.state==='super'&&this.def.id==='soyo') {
+      const s=this.def.scale;
+      ctx.save(); ctx.globalAlpha=0.55; ctx.strokeStyle='#44ff88'; ctx.lineWidth=2.5;
+      for(let i=0;i<5;i++){const dy=-35-i*22;
+        ctx.beginPath();ctx.moveTo(this.x-this.dir*90-i*12,this.y+dy);ctx.lineTo(this.x,this.y+dy);ctx.stroke();}
+      ctx.globalAlpha=1; ctx.restore();
+      if (this.superHitActive>0){
+        ctx.save();ctx.strokeStyle='#aaffcc';ctx.lineWidth=6;
+        ctx.shadowBlur=22;ctx.shadowColor='#00ff88';
+        ctx.beginPath();ctx.moveTo(this.x-60,this.y-125*s);ctx.lineTo(this.x+60,this.y);ctx.stroke();
+        ctx.globalAlpha=0.5;ctx.beginPath();ctx.moveTo(this.x-50,this.y-140*s);ctx.lineTo(this.x+50,this.y-12);ctx.stroke();
+        ctx.globalAlpha=1;ctx.shadowBlur=0;ctx.restore();
+      }
+      ctx.save(); ctx.translate(this.x,this.y);
+      if(this.dir===-1) ctx.scale(-1,1); ctx.scale(s,s);
+      this._shape(); ctx.restore(); return;
+    }
+    if (this.state==='super'&&this.def.id==='icchi') {
+      const s=this.def.scale, pulse=0.45+0.35*Math.sin(Date.now()/90);
+      ctx.save(); ctx.globalAlpha=pulse*0.55; ctx.fillStyle='#00ccff';
+      ctx.shadowBlur=45; ctx.shadowColor='#0088ff';
+      ctx.beginPath(); ctx.arc(this.x,this.y-70*s,65*s,0,Math.PI*2); ctx.fill();
+      ctx.globalAlpha=1; ctx.shadowBlur=0; ctx.restore();
+    }
+    if (this.state==='super'&&this.def.id==='otousan') {
+      const r=18+14*Math.sin(Date.now()/75);
+      ctx.save(); ctx.globalAlpha=0.6; ctx.fillStyle='#330044';
+      ctx.shadowBlur=30; ctx.shadowColor='#8800cc';
+      ctx.beginPath(); ctx.arc(this.x,this.y-60*this.def.scale,r,0,Math.PI*2); ctx.fill();
+      ctx.globalAlpha=1; ctx.shadowBlur=0; ctx.restore();
+    }
+    if (this.state==='super'&&this.def.id==='okaasan') {
+      const s=this.def.scale, pulse=0.4+0.3*Math.sin(Date.now()/80);
+      ctx.save(); ctx.globalAlpha=pulse*0.5; ctx.fillStyle='#ff44cc';
+      ctx.beginPath(); ctx.arc(this.x,this.y-70*s,50*s,0,Math.PI*2); ctx.fill();
+      ctx.globalAlpha=1; ctx.restore();
+    }
+    // --- 通常必殺技ビジュアル (yuuri) ---
     if (this.state==='special'&&this.def.id==='yuuri') {
       ctx.save(); ctx.translate(this.x,this.y-35);
       if (this.dir===-1) ctx.scale(-1,1); ctx.rotate(-0.42);
@@ -877,6 +1182,20 @@ class Fighter {
       ctx.save(); ctx.globalAlpha=aura*0.3; ctx.fillStyle='#22cc44';
       ctx.beginPath(); ctx.arc(this.x,this.y-50,40*aura,0,Math.PI*2); ctx.fill();
       ctx.globalAlpha=1; ctx.restore();
+    }
+    // Freeze effect
+    if (this.frozenFrames>0) {
+      const sc=this.def.scale, alpha=0.55+0.3*Math.sin(Date.now()/55);
+      ctx.save(); ctx.globalAlpha=alpha*0.55; ctx.fillStyle='#aaeeff';
+      ctx.shadowBlur=20; ctx.shadowColor='#00ccff';
+      ctx.beginPath(); ctx.arc(this.x,this.y-65*sc,50*sc,0,Math.PI*2); ctx.fill();
+      ctx.globalAlpha=1; ctx.shadowBlur=0; ctx.restore();
+      ctx.fillStyle='#00ccff'; ctx.font=`bold ${Math.round(11*sc)}px sans-serif`; ctx.textAlign='center';
+      ctx.fillText('❄FREEZE❄',this.x,this.y-(138*sc));
+    }
+    if (this.dmgDebuff>0) {
+      ctx.fillStyle='#ff8800'; ctx.font='bold 10px sans-serif'; ctx.textAlign='center';
+      ctx.fillText('⚡弱体',this.x,this.y-(150*this.def.scale));
     }
     // Special gauge ready glow
     if (this.specialGauge>=this.maxSpecialGauge) {
@@ -1376,7 +1695,7 @@ function checkCollision(a,b) {
     if (info&&b.takeHit(info,a.dir)) {
       a.atkHit=true;
       a.specialGauge=Math.min(a.maxSpecialGauge,a.specialGauge+12);
-      spawnHit((a.x+b.x)/2,b.y-72,a.state==='special');
+      spawnHit((a.x+b.x)/2,b.y-72,a.state==='special'||a.state==='super');
     }
   }
 }
@@ -1393,12 +1712,17 @@ function drawHUD() {
   const sg1=p1.specialGauge/p1.maxSpecialGauge;
   ctx.fillStyle='#111'; ctx.fillRect(20,43,300,11);
   const gc1=ctx.createLinearGradient(20,0,320,0);
-  gc1.addColorStop(0,'#ff6600'); gc1.addColorStop(1,'#ffdd00');
+  gc1.addColorStop(0,'#ff6600'); gc1.addColorStop(0.5,'#ffdd00'); gc1.addColorStop(1,'#ffffff');
   ctx.fillStyle=gc1; ctx.fillRect(20,43,sg1*300,11);
   ctx.strokeStyle='#555'; ctx.lineWidth=1; ctx.strokeRect(20,43,300,11);
-  if (p1.specialGauge>=p1.maxSpecialGauge&&Math.floor(Date.now()/280)%2) {
+  ctx.strokeStyle='rgba(255,255,255,0.5)'; ctx.lineWidth=1;
+  ctx.beginPath(); ctx.moveTo(120,43); ctx.lineTo(120,54); ctx.stroke();
+  if (p1.specialGauge>=p1.maxSpecialGauge&&Math.floor(Date.now()/220)%2) {
+    ctx.fillStyle='#ffdd00'; ctx.font='bold 9px sans-serif'; ctx.textAlign='left';
+    ctx.fillText('超必殺 READY!',24,52);
+  } else if (p1.specialGauge>=Math.floor(p1.maxSpecialGauge/3)&&p1.specialGauge<p1.maxSpecialGauge&&Math.floor(Date.now()/300)%2) {
     ctx.fillStyle='#fff'; ctx.font='bold 9px sans-serif'; ctx.textAlign='left';
-    ctx.fillText('必殺技 READY!',24,52);
+    ctx.fillText('必殺技 READY',24,52);
   }
 
   ctx.fillStyle='#222'; ctx.fillRect(W-320,18,300,22);
@@ -1411,12 +1735,17 @@ function drawHUD() {
   const sg2=p2.specialGauge/p2.maxSpecialGauge;
   ctx.fillStyle='#111'; ctx.fillRect(W-320,43,300,11);
   const gc2=ctx.createLinearGradient(W-320,0,W-20,0);
-  gc2.addColorStop(0,'#ffdd00'); gc2.addColorStop(1,'#ff6600');
+  gc2.addColorStop(0,'#ffffff'); gc2.addColorStop(0.5,'#ffdd00'); gc2.addColorStop(1,'#ff6600');
   ctx.fillStyle=gc2; ctx.fillRect(W-320+(300-sg2*300),43,sg2*300,11);
   ctx.strokeStyle='#555'; ctx.lineWidth=1; ctx.strokeRect(W-320,43,300,11);
-  if (p2.specialGauge>=p2.maxSpecialGauge&&Math.floor(Date.now()/280)%2) {
+  ctx.strokeStyle='rgba(255,255,255,0.5)'; ctx.lineWidth=1;
+  ctx.beginPath(); ctx.moveTo(W-220,43); ctx.lineTo(W-220,54); ctx.stroke();
+  if (p2.specialGauge>=p2.maxSpecialGauge&&Math.floor(Date.now()/220)%2) {
+    ctx.fillStyle='#ffdd00'; ctx.font='bold 9px sans-serif'; ctx.textAlign='right';
+    ctx.fillText('超必殺 READY!',W-24,52);
+  } else if (p2.specialGauge>=Math.floor(p2.maxSpecialGauge/3)&&p2.specialGauge<p2.maxSpecialGauge&&Math.floor(Date.now()/300)%2) {
     ctx.fillStyle='#fff'; ctx.font='bold 9px sans-serif'; ctx.textAlign='right';
-    ctx.fillText('必殺技 READY!',W-24,52);
+    ctx.fillText('必殺技 READY',W-24,52);
   }
 
   ctx.fillStyle='#111'; ctx.fillRect(W/2-32,14,64,34);
@@ -1705,7 +2034,7 @@ function startRound() {
   fighters=[p1,p2];
   cpuCtrl=gameMode==='cpu'?new CPU(p2,p1):null;
   projectiles.length=0; wordProjs.length=0;
-  hurdleAttack=null; activeGorilla=null;
+  hurdleAttack=null; activeGorilla=null; activeDragon=null; activeBlackHole=null;
   timerSec=99; timerTick=0;
 }
 
@@ -1839,6 +2168,9 @@ function loop() {
     updateHurdles(p1,p2);
     updateWords(p1,p2);
 
+    if (activeDragon) activeDragon.update();
+    if (activeBlackHole) activeBlackHole.update(p1,p2);
+
     if (activeGorilla) {
       activeGorilla.update();
       if (activeGorilla&&activeGorilla.t>0&&!activeGorilla.atkHit) {
@@ -1892,6 +2224,8 @@ function loop() {
   drawHurdles();
   p1.draw(); p2.draw();
   if (activeGorilla) activeGorilla.draw();
+  if (activeDragon) activeDragon.draw();
+  if (activeBlackHole) activeBlackHole.draw();
   drawProjectiles();
   drawWords();
   drawEffects();
