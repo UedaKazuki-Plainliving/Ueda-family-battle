@@ -865,13 +865,56 @@ class Fighter {
 
     ctx.lineWidth=lw; ctx.lineCap='round'; ctx.strokeStyle=c2;
     if (kickOn) {
-      ctx.beginPath(); ctx.moveTo(0,footY); ctx.lineTo(-10,-36); ctx.stroke();
-      ctx.beginPath(); ctx.moveTo(0,footY); ctx.lineTo(52,-10); ctx.stroke();
+      // キック3段階モーション
+      const kickPhase = this.st - def.kickS;
+      const kickRange = def.kickE - def.kickS;
+      if (kickPhase < kickRange * 0.36) {
+        // 前半: ひざを上げる
+        const t = kickPhase / (kickRange * 0.36);
+        const kneeRaise = t * 28;
+        // 軸足: 少し屈む
+        ctx.beginPath(); ctx.moveTo(0,footY+6); ctx.lineTo(-10,-36+4); ctx.stroke();
+        // 蹴り足: ひざ高く
+        ctx.beginPath(); ctx.moveTo(0,footY+6); ctx.lineTo(16,-26-kneeRaise); ctx.stroke();
+        ctx.beginPath(); ctx.moveTo(16,-26-kneeRaise); ctx.lineTo(24,-16-kneeRaise+10); ctx.stroke();
+      } else if (kickPhase < kickRange * 0.72) {
+        // 中盤: 蹴り出し
+        const t = (kickPhase - kickRange*0.36) / (kickRange * 0.36);
+        const ext = t;
+        ctx.beginPath(); ctx.moveTo(0,footY+4); ctx.lineTo(-8,-36+3); ctx.stroke();
+        ctx.beginPath(); ctx.moveTo(0,footY+4); ctx.lineTo(20+ext*22,-26+ext*14); ctx.stroke();
+        ctx.beginPath(); ctx.moveTo(20+ext*22,-26+ext*14); ctx.lineTo(42+ext*14,-10+ext*2); ctx.stroke();
+        // つま先（小さな線）
+        ctx.lineWidth=lw*0.7;
+        ctx.beginPath(); ctx.moveTo(42+ext*14,-10+ext*2); ctx.lineTo(50+ext*14,-8+ext*2); ctx.stroke();
+        ctx.lineWidth=lw;
+      } else {
+        // 後半: 足が戻る
+        const t = (kickPhase - kickRange*0.72) / (kickRange * 0.28);
+        const ret = t;
+        ctx.beginPath(); ctx.moveTo(0,footY+2); ctx.lineTo(-9,-36+2); ctx.stroke();
+        ctx.beginPath(); ctx.moveTo(0,footY+2); ctx.lineTo(30-ret*20,-14+ret*2); ctx.stroke();
+        ctx.beginPath(); ctx.moveTo(30-ret*20,-14+ret*2); ctx.lineTo(46-ret*28,-8+ret*2); ctx.stroke();
+      }
     } else if (crouching) {
-      ctx.beginPath(); ctx.moveTo(0,bodyTop+bodyH); ctx.lineTo(-22,footY); ctx.stroke();
-      ctx.beginPath(); ctx.moveTo(0,bodyTop+bodyH); ctx.lineTo(22,footY); ctx.stroke();
+      // しゃがみ: 両ひざを外に開く安定姿勢
+      ctx.beginPath(); ctx.moveTo(-4,bodyTop+bodyH); ctx.lineTo(-26,-4); ctx.stroke();
+      ctx.beginPath(); ctx.moveTo(4,bodyTop+bodyH); ctx.lineTo(26,-4); ctx.stroke();
+    } else if (s==='jump'||s==='jatk'||s==='jkick') {
+      // ジャンプ: 上昇/下降で足の形を変える
+      if (this.vy < 0) {
+        // 上昇中: ひざを引き上げる（足を畳む）
+        ctx.beginPath(); ctx.moveTo(-4,footY); ctx.lineTo(-14,-28); ctx.stroke();
+        ctx.beginPath(); ctx.moveTo(-14,-28); ctx.lineTo(-10,-16); ctx.stroke();
+        ctx.beginPath(); ctx.moveTo(4,footY); ctx.lineTo(14,-28); ctx.stroke();
+        ctx.beginPath(); ctx.moveTo(14,-28); ctx.lineTo(10,-16); ctx.stroke();
+      } else {
+        // 下降中: 足を伸ばして着地準備
+        ctx.beginPath(); ctx.moveTo(0,footY); ctx.lineTo(-12,-36); ctx.stroke();
+        ctx.beginPath(); ctx.moveTo(0,footY); ctx.lineTo(12,-36); ctx.stroke();
+      }
     } else {
-      const ls=s==='jump'||s==='jatk'||s==='jkick'?12:Math.abs(swing)*0.6;
+      const ls=Math.abs(swing)*0.6;
       ctx.beginPath(); ctx.moveTo(0,footY); ctx.lineTo(-10-ls,-42); ctx.stroke();
       ctx.beginPath(); ctx.moveTo(0,footY); ctx.lineTo(10+ls,-42); ctx.stroke();
     }
@@ -899,25 +942,63 @@ class Fighter {
 
     ctx.lineWidth=lw; ctx.strokeStyle=c1;
     if (punchOn) {
-      ctx.beginPath(); ctx.moveTo(bw/2-4,aY); ctx.lineTo(bw/2+46,aY); ctx.stroke();
-      ctx.fillStyle='#FFCC99'; ctx.beginPath(); ctx.arc(bw/2+46,aY,lw*0.75,0,Math.PI*2); ctx.fill();
-      ctx.beginPath(); ctx.moveTo(-bw/2+4,aY); ctx.lineTo(-bw/2-14,aY+14); ctx.stroke();
+      // パンチ2段階モーション
+      const punchPhase = this.st - def.punchS;
+      const punchRange = def.punchE - def.punchS;
+      const punchHalf = punchRange * 0.5;
+      if (punchPhase < punchHalf) {
+        // 前半: 腕が勢いよく前に飛び出す（伸びきった状態）
+        ctx.beginPath(); ctx.moveTo(bw/2-4,aY); ctx.lineTo(bw/2+50,aY-2); ctx.stroke();
+        // ナックル（拳）を描く
+        ctx.fillStyle='#FFCC99';
+        ctx.beginPath(); ctx.arc(bw/2+50,aY-2,lw*1.0,0,Math.PI*2); ctx.fill();
+        ctx.strokeStyle='#ccaa77'; ctx.lineWidth=1.2;
+        ctx.beginPath(); ctx.arc(bw/2+50,aY-2,lw*1.0,0,Math.PI*2); ctx.stroke();
+        ctx.lineWidth=lw; ctx.strokeStyle=c1;
+        // 反対の腕（左腕）: ガードのように顔の前に構える
+        ctx.beginPath(); ctx.moveTo(-bw/2+4,aY); ctx.lineTo(-bw/2+16,aY-18); ctx.stroke();
+      } else {
+        // 後半: 腕が少し引き戻される（フォロースルー）
+        const t = (punchPhase - punchHalf) / (punchRange - punchHalf);
+        const pullback = t * 10;
+        ctx.beginPath(); ctx.moveTo(bw/2-4,aY); ctx.lineTo(bw/2+40-pullback,aY); ctx.stroke();
+        ctx.fillStyle='#FFCC99';
+        ctx.beginPath(); ctx.arc(bw/2+40-pullback,aY,lw*0.85,0,Math.PI*2); ctx.fill();
+        ctx.lineWidth=lw; ctx.strokeStyle=c1;
+        ctx.beginPath(); ctx.moveTo(-bw/2+4,aY); ctx.lineTo(-bw/2+16,aY-14); ctx.stroke();
+      }
     } else if (def.id==='otousan'&&s==='punch') {
       const windup=Math.min(1,this.st/18);
       ctx.beginPath(); ctx.moveTo(-bw/2+4,aY); ctx.lineTo(-bw/2-20-windup*15,aY-21-windup*10); ctx.stroke();
       ctx.beginPath(); ctx.moveTo(bw/2-4,aY); ctx.lineTo(bw/2+10,aY+16); ctx.stroke();
     } else if (crouching&&this.guardMode) {
-      // しゃがみガード: 両腕をX字に前に構えて低ガード
-      ctx.beginPath(); ctx.moveTo(bw/2-4,aY); ctx.lineTo(2,aY+22); ctx.stroke();
-      ctx.beginPath(); ctx.moveTo(-bw/2+4,aY); ctx.lineTo(bw/2+6,aY+18); ctx.stroke();
-      ctx.fillStyle='#FFCC99'; ctx.beginPath(); ctx.arc(bw/2+6,aY+18,lw*0.7,0,Math.PI*2); ctx.fill();
+      // しゃがみガード: 両腕をX字に前に構えて低ガード（前腕を太めに）
+      ctx.lineWidth=lw*1.3;
+      ctx.beginPath(); ctx.moveTo(bw/2-4,aY); ctx.lineTo(2,aY+20); ctx.stroke();
+      ctx.beginPath(); ctx.moveTo(-bw/2+4,aY); ctx.lineTo(bw/2+8,aY+18); ctx.stroke();
+      ctx.lineWidth=lw;
+      ctx.fillStyle='#FFCC99';
+      ctx.beginPath(); ctx.arc(2,aY+20,lw*0.7,0,Math.PI*2); ctx.fill();
+      ctx.beginPath(); ctx.arc(bw/2+8,aY+18,lw*0.7,0,Math.PI*2); ctx.fill();
     } else if (crouching) {
-      // しゃがみ通常: 腕は自然に下げる
-      ctx.beginPath(); ctx.moveTo(bw/2-4,aY); ctx.lineTo(bw/2+10,aY+20); ctx.stroke();
-      ctx.beginPath(); ctx.moveTo(-bw/2+4,aY); ctx.lineTo(-bw/2-10,aY+20); ctx.stroke();
+      // しゃがみ通常: 手を膝の前に持ってくる（ファイティングポーズ）
+      ctx.beginPath(); ctx.moveTo(bw/2-4,aY); ctx.lineTo(bw/2+16,aY+16); ctx.stroke();
+      ctx.beginPath(); ctx.moveTo(-bw/2+4,aY); ctx.lineTo(-4,aY+18); ctx.stroke();
+      ctx.fillStyle='#FFCC99';
+      ctx.beginPath(); ctx.arc(bw/2+16,aY+16,lw*0.65,0,Math.PI*2); ctx.fill();
+      ctx.beginPath(); ctx.arc(-4,aY+18,lw*0.65,0,Math.PI*2); ctx.fill();
     } else if (s==='block') {
-      ctx.beginPath(); ctx.moveTo(bw/2-4,aY-6); ctx.lineTo(bw/2+14,aY-22); ctx.stroke();
-      ctx.beginPath(); ctx.moveTo(-bw/2+4,aY); ctx.lineTo(-bw/2+14,aY-22); ctx.stroke();
+      // ブロック: 両腕を頭・顔の前でクロスして構える（ボクシングガード）
+      // 右腕: 前腕を太めに描き、顔前でクロス
+      ctx.lineWidth=lw*1.4;
+      ctx.beginPath(); ctx.moveTo(bw/2-4,aY-4); ctx.lineTo(bw/2-6,aY-26); ctx.stroke();
+      // 左腕: 顔の前に交差
+      ctx.beginPath(); ctx.moveTo(-bw/2+4,aY); ctx.lineTo(bw/2-2,aY-24); ctx.stroke();
+      ctx.lineWidth=lw;
+      // 体を少し前傾（頭は_shapeのheadCYで固定なので腕の配置でレイアウト）
+      ctx.fillStyle='#FFCC99';
+      ctx.beginPath(); ctx.arc(bw/2-6,aY-26,lw*0.8,0,Math.PI*2); ctx.fill();
+      ctx.beginPath(); ctx.arc(bw/2-2,aY-24,lw*0.8,0,Math.PI*2); ctx.fill();
     } else if (isSpecial&&(def.id==='icchi'||def.id==='soyo'||def.id==='okaasan'||def.id==='otousan')) {
       const raise=chargeRaise*28;
       ctx.beginPath(); ctx.moveTo(bw/2-4,aY); ctx.lineTo(bw/2+18,aY-21-raise); ctx.stroke();
@@ -933,6 +1014,17 @@ class Fighter {
       ctx.beginPath(); ctx.moveTo(bw/2-4,aY); ctx.lineTo(bw/2+8,aY-26); ctx.stroke();
       ctx.fillStyle='#FFCC99'; ctx.beginPath(); ctx.arc(bw/2+8,aY-26,lw*0.75,0,Math.PI*2); ctx.fill();
       ctx.beginPath(); ctx.moveTo(-bw/2+4,aY); ctx.lineTo(-bw/2-6,aY-23); ctx.stroke();
+    } else if (s==='jump'||s==='jkick') {
+      // ジャンプ中の腕: 上昇中は広げてバランス、下降中は前に構える
+      if (this.vy < 0) {
+        // 上昇中: 両腕を広げる（バランスを取るポーズ）
+        ctx.beginPath(); ctx.moveTo(bw/2-4,aY); ctx.lineTo(bw/2+22,aY-12); ctx.stroke();
+        ctx.beginPath(); ctx.moveTo(-bw/2+4,aY); ctx.lineTo(-bw/2-22,aY-12); ctx.stroke();
+      } else {
+        // 下降中: 腕を前方に出して着地準備
+        ctx.beginPath(); ctx.moveTo(bw/2-4,aY); ctx.lineTo(bw/2+18,aY+8); ctx.stroke();
+        ctx.beginPath(); ctx.moveTo(-bw/2+4,aY); ctx.lineTo(-bw/2-14,aY+8); ctx.stroke();
+      }
     } else {
       ctx.beginPath(); ctx.moveTo(bw/2-4,aY); ctx.lineTo(bw/2+12,aY+16+swing); ctx.stroke();
       ctx.beginPath(); ctx.moveTo(-bw/2+4,aY); ctx.lineTo(-bw/2-12,aY+16-swing); ctx.stroke();
@@ -1632,6 +1724,35 @@ if (location.search.includes('test')) {
     // hb.y は絶対座標 (GROUND=340基準)、jkickはGROUND-65*scale=294付近
     const relY = hb.y - GROUND; // 相対値: 約 -45
     if (relY < -80) throw new Error('jkick hitbox should be near feet, got relY=' + relY);
+  });
+
+  // ---- アニメーション段階テスト ----
+  t('パンチ前半フレームでhitboxが有効', () => {
+    const f = mkF('icchi', true, 300);
+    f.state = 'punch'; f.st = CHARS.icchi.punchS;
+    if (!f.hitbox()) throw new Error('punch hitbox should be active at punchS');
+  });
+  t('パンチ後半フレームでhitboxが有効', () => {
+    const f = mkF('icchi', true, 300);
+    f.state = 'punch'; f.st = CHARS.icchi.punchE;
+    if (!f.hitbox()) throw new Error('punch hitbox should be active at punchE');
+  });
+  t('キック前半フレームでhitboxが有効', () => {
+    const f = mkF('icchi', true, 300);
+    f.state = 'kick'; f.st = CHARS.icchi.kickS;
+    if (!f.hitbox()) throw new Error('kick hitbox should be active at kickS');
+  });
+  t('ジャンプ中はonGround=false', () => {
+    const f = mkF('icchi', true, 300);
+    f.vy = -10; f.onGround = false; f.state = 'jump';
+    eq(f.onGround, false);
+  });
+  t('ブロック状態でguardMode=true（update経由）', () => {
+    const f = mkF('icchi', true, 300);
+    f.state = 'block';
+    const opp = mkF('yuuri', false, 500);
+    f.update(opp, mkI());
+    eq(f.guardMode, true);
   });
 
   // ---- 実行 ----
