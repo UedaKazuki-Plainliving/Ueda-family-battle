@@ -2,22 +2,83 @@
 <html lang="ja">
 <head>
 <meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
 <title>大乱闘　ウエダファミリー</title>
 <style>
-  * { margin: 0; padding: 0; box-sizing: border-box; }
-  body { background: #000; display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100vh; }
-  canvas { display: block; border: 2px solid #444; }
-  #controls { color: #666; font: 12px monospace; margin-top: 6px; text-align: center; }
+  * { margin: 0; padding: 0; box-sizing: border-box; touch-action: none; -webkit-user-select: none; user-select: none; }
+  body { background: #000; display: flex; flex-direction: column; align-items: center; justify-content: flex-start; min-height: 100vh; overflow: hidden; }
+  #wrap { position: relative; width: 100vw; }
+  canvas { display: block; width: 100vw; height: auto; touch-action: none; -webkit-user-select: none; user-select: none; }
+  #nav-ctrls {
+    display: flex; justify-content: center; align-items: center; gap: 24px;
+    padding: 10px 0; background: #111; width: 100%;
+  }
+  #fight-ctrls {
+    display: none;
+    position: relative; width: 100%; background: #111;
+    padding: 8px 10px; user-select: none;
+  }
+  .ctrl-row { display: flex; justify-content: space-between; align-items: center; }
+  .dpad { position: relative; width: 126px; height: 126px; }
+  .dpad-btn {
+    position: absolute; background: rgba(255,255,255,0.13); border: 2px solid rgba(255,255,255,0.25);
+    border-radius: 8px; display: flex; align-items: center; justify-content: center;
+    font-size: 22px; color: #fff; touch-action: none;
+  }
+  .dpad-btn:active, .dpad-btn.active { background: rgba(255,255,255,0.35); }
+  #btn-left  { left: 0;   top: 42px; width: 42px; height: 42px; }
+  #btn-right { left: 84px; top: 42px; width: 42px; height: 42px; }
+  #btn-up    { left: 42px; top: 0;    width: 42px; height: 42px; }
+  #btn-down  { left: 42px; top: 84px; width: 42px; height: 42px; }
+  .action-btns { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+  .abtn {
+    width: 58px; height: 58px; border-radius: 50%;
+    background: rgba(255,255,255,0.13); border: 2px solid rgba(255,255,255,0.3);
+    color: #fff; font-size: 11px; font-weight: bold; text-align: center;
+    display: flex; align-items: center; justify-content: center;
+    touch-action: none; flex-direction: column; line-height: 1.1;
+  }
+  .abtn:active, .abtn.active { background: rgba(255,255,255,0.4); }
+  #btn-punch { border-color: #ff9900; color: #ff9900; }
+  #btn-kick  { border-color: #00ccee; color: #00ccee; }
+  #btn-block { border-color: #aaa; color: #aaa; }
+  #btn-special { border-color: #ffdd00; color: #ffdd00; font-size: 10px; }
+  .nbtn {
+    padding: 10px 22px; border-radius: 8px; background: rgba(255,255,255,0.12);
+    border: 2px solid rgba(255,255,255,0.3); color: #fff; font-size: 18px;
+    touch-action: none;
+  }
+  .nbtn:active { background: rgba(255,255,255,0.35); }
 </style>
 </head>
 <body>
-<canvas id="game" width="800" height="450"></canvas>
-<div id="controls">
-  A/D 移動 &nbsp; W ジャンプ &nbsp; S しゃがみ &nbsp; J パンチ &nbsp; K キック &nbsp; L ガード &nbsp;
-  <span style="color:#ffaa00">Space 必殺技</span>
+<div id="wrap">
+  <canvas id="game" width="800" height="450"></canvas>
+  <div id="nav-ctrls">
+    <button class="nbtn" id="nav-left">◀</button>
+    <button class="nbtn" id="nav-ok">決定</button>
+    <button class="nbtn" id="nav-right">▶</button>
+  </div>
+  <div id="fight-ctrls">
+    <div class="ctrl-row">
+      <div class="dpad">
+        <div class="dpad-btn" id="btn-up">▲</div>
+        <div class="dpad-btn" id="btn-left">◀</div>
+        <div class="dpad-btn" id="btn-right">▶</div>
+        <div class="dpad-btn" id="btn-down">▼</div>
+      </div>
+      <div class="action-btns">
+        <div class="abtn" id="btn-punch">👊<br>パンチ</div>
+        <div class="abtn" id="btn-kick">🦵<br>キック</div>
+        <div class="abtn" id="btn-block">🛡<br>ガード</div>
+        <div class="abtn" id="btn-special">⚡<br>必殺技</div>
+      </div>
+    </div>
+  </div>
 </div>
 <script>
 'use strict';
+const IS_TOUCH = ('ontouchstart' in window) || navigator.maxTouchPoints > 0;
 const canvas = document.getElementById('game');
 const ctx = canvas.getContext('2d');
 const W = 800, H = 450, GROUND = 340;
@@ -40,6 +101,80 @@ const keys = {};
 document.addEventListener('keydown', e => { keys[e.code] = true; e.preventDefault(); });
 document.addEventListener('keyup',   e => { keys[e.code] = false; });
 function keyOnce(code) { if (keys[code]) { keys[code] = false; return true; } return false; }
+
+// Touch binding helpers — use both touch and pointer events for reliability
+function bindHold(el, code) {
+  const on  = e => { e.preventDefault(); keys[code] = true;  el.classList.add('active'); };
+  const off = e => { e.preventDefault(); keys[code] = false; el.classList.remove('active'); };
+  el.addEventListener('pointerdown',   on,  {passive: false});
+  el.addEventListener('pointerup',     off, {passive: false});
+  el.addEventListener('pointercancel', off, {passive: false});
+  el.addEventListener('pointerleave',  off, {passive: false});
+  el.addEventListener('touchstart',    on,  {passive: false});
+  el.addEventListener('touchend',      off, {passive: false});
+  el.addEventListener('touchcancel',   off, {passive: false});
+}
+function bindTap(el, code) {
+  const on  = e => { e.preventDefault(); keys[code] = true; };
+  const off = e => { e.preventDefault(); keys[code] = false; };
+  el.addEventListener('pointerdown', on,  {passive: false});
+  el.addEventListener('pointerup',   off, {passive: false});
+  el.addEventListener('touchstart',  on,  {passive: false});
+  el.addEventListener('touchend',    off, {passive: false});
+}
+
+bindHold(document.getElementById('btn-left'),    'KeyA');
+bindHold(document.getElementById('btn-right'),   'KeyD');
+bindHold(document.getElementById('btn-up'),      'KeyW');
+bindHold(document.getElementById('btn-down'),    'KeyS');
+bindHold(document.getElementById('btn-punch'),   'KeyJ');
+bindHold(document.getElementById('btn-kick'),    'KeyK');
+bindHold(document.getElementById('btn-block'),   'KeyL');
+bindHold(document.getElementById('btn-special'), 'Space');
+bindTap(document.getElementById('nav-left'),  'ArrowLeft');
+bindTap(document.getElementById('nav-right'), 'ArrowRight');
+bindTap(document.getElementById('nav-ok'),    'Enter');
+
+// Prevent all default touch behavior (zoom, scroll, callout) for the game
+document.addEventListener('touchstart',  e => e.preventDefault(), {passive: false});
+document.addEventListener('touchmove',   e => e.preventDefault(), {passive: false});
+document.addEventListener('touchend',    e => e.preventDefault(), {passive: false});
+document.addEventListener('touchcancel', e => e.preventDefault(), {passive: false});
+
+// Canvas tap handler for charselect & intro
+canvas.addEventListener('pointerdown', e => {
+  if (audio.state === 'suspended') audio.resume();
+  if (phase === 'intro') { keys['Enter'] = true; return; }
+  if (phase === 'charselect') {
+    const rect = canvas.getBoundingClientRect();
+    const scaleX = W / rect.width;
+    const tx = (e.clientX - rect.left) * scaleX;
+    const PW=136, GAP=20, startX=20;
+    for (let idx=0; idx<CHAR_LIST.length; idx++) {
+      const px = startX + idx*(PW+GAP);
+      if (tx >= px && tx <= px+PW) {
+        if (selectStep===0) selectedCharIdx=idx;
+        else cpuCharIdx=idx;
+        beep(350,'sine',0.08);
+        break;
+      }
+    }
+  }
+});
+
+// Show/hide fight vs nav controls
+if (IS_TOUCH) {
+  setInterval(() => {
+    const inFight = phase === 'fight' || phase === 'roundend' || phase === 'countdown';
+    document.getElementById('fight-ctrls').style.display = inFight ? 'block' : 'none';
+    document.getElementById('nav-ctrls').style.display   = inFight ? 'none'  : 'flex';
+  }, 80);
+} else {
+  document.getElementById('fight-ctrls').style.display = 'none';
+  document.getElementById('nav-ctrls').style.display   = 'none';
+  canvas.style.width  = '';
+  canvas.style.height = '';
+}
 
 // ---- Character Definitions ----
 const CHARS = {
@@ -200,7 +335,7 @@ function drawSpecialBanner() {
   ctx.globalAlpha=1; specialBanner.t--;
 }
 
-// ---- Projectiles (dragon sword, baseball) ----
+// ---- Projectiles ----
 const projectiles = [];
 
 function spawnDragonSword(owner) {
@@ -494,13 +629,11 @@ class Fighter {
     const standG=this.state==='block'&&facing;
     const crouchG=this.guardMode&&this.state==='crouch'&&facing;
     this.specialGauge=Math.min(this.maxSpecialGauge,this.specialGauge+8);
-    // 立ちガード→パンチ/空中パンチ無効、しゃがみガード→キック/空中キック無効
     if ((standG&&(type==='punch'||type==='jatk'))||(crouchG&&(type==='kick'||type==='jkick'))) {
       this.blockStun=18; this.guardFlash=14;
       beep(95,'sine',0.28,0.18); beep(60,'sine',0.14,0.14);
       return true;
     }
-    // どちらのガードでも必殺技はダメージ軽減
     if ((standG||crouchG)&&type==='special') {
       this.hp-=Math.max(1,Math.floor(info.dmg*0.4));
       this.blockStun=10; this.guardFlash=9;
@@ -519,10 +652,8 @@ class Fighter {
     if (this.hitStun>0) this.hitStun--;
     if (this.blockStun>0) this.blockStun--;
     if (this.guardFlash>0) this.guardFlash--;
-    // ガードモード: 立ちガードボタン or しゃがみ+ガードボタン
     this.guardMode=(this.state==='block')||(this.state==='crouch'&&!!inp.block);
 
-    // Special state
     if (this.state==='special') {
       const id=this.def.id;
       if (id==='yuuri') {
@@ -540,7 +671,6 @@ class Fighter {
       return;
     }
 
-    // Gravity
     if (!this.onGround) {
       this.vy+=this.def.gravity; this.y+=this.vy;
       if (this.y>=GROUND){this.y=GROUND;this.vy=0;this.onGround=true;
@@ -553,7 +683,6 @@ class Fighter {
     if (atk) {
       const def=this.def;
       const dur=this.state==='punch'?def.punchDur:(this.state==='kick'||this.state==='jkick')?def.kickDur:def.jatkDur;
-      // Baseball fire signal
       if (this.state==='punch'&&def.punchIsProjectile&&this.st===def.punchS&&!this.punchFired) this.punchFired=true;
       if (this.st>=dur){this.state='idle';this.st=0;this.atkHit=false;}
       return;
@@ -562,7 +691,6 @@ class Fighter {
 
     const ok=this.blockStun===0;
 
-    // Special activation
     if (ok&&inp.special&&this.specialGauge>=this.maxSpecialGauge&&this.onGround) {
       this.state='special';this.st=0;this.specialGauge=0;this.specialFired=false;this.punchFired=false;
       if (this.def.id==='yuuri'){this.specialVx=this.dir*14;this.vy=-8;this.onGround=false;}
@@ -651,7 +779,6 @@ class Fighter {
       ctx.strokeStyle='#4477ff'; ctx.lineWidth=3.5*sc;
       ctx.globalAlpha=gf*0.88;
       if (isCG) {
-        // しゃがみガード: 横に広い低いバリア弧
         ctx.beginPath(); ctx.arc(gx,gy,r,-Math.PI*0.85,Math.PI*0.85); ctx.stroke();
         ctx.lineWidth=2*sc;
         ctx.beginPath(); ctx.arc(gx,gy,r*0.45,-Math.PI*0.7,Math.PI*0.7); ctx.stroke();
@@ -662,7 +789,6 @@ class Fighter {
         ctx.font=`bold ${Math.round(10*sc)}px sans-serif`; ctx.textAlign='center';
         ctx.fillText('しゃがみガード',gx,gy+r+13*sc);
       } else {
-        // 立ちガード: 縦型バリア弧
         ctx.beginPath(); ctx.arc(gx,gy,r,-Math.PI*0.72,Math.PI*0.72); ctx.stroke();
         ctx.lineWidth=2*sc;
         ctx.beginPath(); ctx.arc(gx,gy,r*0.52,-Math.PI*0.55,Math.PI*0.55); ctx.stroke();
@@ -696,25 +822,20 @@ class Fighter {
                  (s==='jkick'&&this.st>=def.kickS&&this.st<=def.kickE);
     const isSpecial=s==='special';
     const chargeRaise=isSpecial?Math.min(1,this.st/10):0;
-    // 位置変数: しゃがみ時はキャラを低く短く
     const bodyTop=crouching?-50:-84;
     const bodyH  =crouching?28:48;
     const beltY  =crouching?-30:-44;
-    const aY     =bodyTop+10;   // 肩の高さ: しゃがみ=-40, 立ち=-74
+    const aY     =bodyTop+10;
     const headCY =crouching?-68:-106;
     const footY  =crouching?-8:-18;
 
-    // Shadow
     ctx.fillStyle='rgba(0,0,0,0.25)'; ctx.beginPath(); ctx.ellipse(0,2,26,7,0,0,Math.PI*2); ctx.fill();
 
-    // Legs
     ctx.lineWidth=lw; ctx.lineCap='round'; ctx.strokeStyle=c2;
     if (kickOn) {
-      // 低い位置を狙うキック
       ctx.beginPath(); ctx.moveTo(0,footY); ctx.lineTo(-10,-36); ctx.stroke();
       ctx.beginPath(); ctx.moveTo(0,footY); ctx.lineTo(52,-10); ctx.stroke();
     } else if (crouching) {
-      // しゃがみ: 膝を曲げて横に広げる
       ctx.beginPath(); ctx.moveTo(0,bodyTop+bodyH); ctx.lineTo(-22,footY); ctx.stroke();
       ctx.beginPath(); ctx.moveTo(0,bodyTop+bodyH); ctx.lineTo(22,footY); ctx.stroke();
     } else {
@@ -723,10 +844,8 @@ class Fighter {
       ctx.beginPath(); ctx.moveTo(0,footY); ctx.lineTo(10+ls,-42); ctx.stroke();
     }
 
-    // Body
     ctx.fillStyle=c1; ctx.fillRect(-bw/2,bodyTop,bw,bodyH);
     ctx.fillStyle=c2; ctx.fillRect(-bw/2,beltY,bw,8);
-    // おとうさん: スーツ+ネクタイ
     if (def.id==='otousan') {
       ctx.fillStyle='#223355'; ctx.fillRect(-bw/2,bodyTop,bw,bodyH);
       ctx.fillStyle='#ffffff'; ctx.fillRect(-4,bodyTop+2,8,bodyH-10);
@@ -737,7 +856,6 @@ class Fighter {
       ctx.lineTo(0,beltY+8); ctx.lineTo(-8,beltY); ctx.lineTo(-5,bodyTop+27);
       ctx.closePath(); ctx.fill();
     }
-    // ゆうり: スポーツジャージ
     if (def.id==='yuuri') {
       ctx.fillStyle='rgba(255,255,255,0.2)';
       ctx.fillRect(-bw/2+2,bodyTop+2,5,bodyH-4); ctx.fillRect(bw/2-7,bodyTop+2,5,bodyH-4);
@@ -745,7 +863,6 @@ class Fighter {
       ctx.fillText('7',0,beltY-10);
     }
 
-    // Arms
     ctx.lineWidth=lw; ctx.strokeStyle=c1;
     if (punchOn) {
       ctx.beginPath(); ctx.moveTo(bw/2-4,aY); ctx.lineTo(bw/2+46,aY); ctx.stroke();
@@ -765,7 +882,6 @@ class Fighter {
       ctx.beginPath(); ctx.moveTo(bw/2-4,aY); ctx.lineTo(bw/2+10,aY+20); ctx.stroke();
       ctx.beginPath(); ctx.moveTo(-bw/2+4,aY); ctx.lineTo(-bw/2-10,aY+20); ctx.stroke();
     } else if (s==='block') {
-      // 立ちガード: 上段をカバー
       ctx.beginPath(); ctx.moveTo(bw/2-4,aY-6); ctx.lineTo(bw/2+14,aY-22); ctx.stroke();
       ctx.beginPath(); ctx.moveTo(-bw/2+4,aY); ctx.lineTo(-bw/2+14,aY-22); ctx.stroke();
     } else if (isSpecial&&(def.id==='icchi'||def.id==='soyo'||def.id==='okaasan'||def.id==='otousan')) {
@@ -788,23 +904,19 @@ class Fighter {
       ctx.beginPath(); ctx.moveTo(-bw/2+4,aY); ctx.lineTo(-bw/2-12,aY+16-swing); ctx.stroke();
     }
 
-    // Head
     const hbob=s==='walk'?Math.sin(this.af*Math.PI)*2:0;
     const hy=headCY+hbob;
     ctx.fillStyle='#FFCC99'; ctx.beginPath(); ctx.arc(0,hy,18,0,Math.PI*2); ctx.fill();
 
-    // Hair styles
     const hs=def.hairStyle??'band';
     const hc=s==='dead'?'#555':c1;
     if (hs==='spiky') {
-      // いっちー: 細い少年・スパイキーヘア
       ctx.fillStyle=hc; ctx.beginPath(); ctx.arc(0,hy-8,12,Math.PI,0); ctx.fill();
       [[-8,hy-23],[-2,hy-27],[5,hy-25],[10,hy-19]].forEach(([sx,sy])=>{
         ctx.beginPath(); ctx.moveTo(sx-4,hy-12); ctx.lineTo(sx,sy); ctx.lineTo(sx+4,hy-12); ctx.closePath(); ctx.fill();
       });
       ctx.fillStyle=c2; ctx.fillRect(-4,hy-13,8,4);
     } else if (hs==='longsporty') {
-      // ゆうり: 髪の長いスポーティー女子
       ctx.fillStyle=hc;
       ctx.beginPath(); ctx.moveTo(-13,hy-16); ctx.bezierCurveTo(-22,hy-2,-24,hy+20,-16,hy+44);
       ctx.lineTo(-10,hy+42); ctx.bezierCurveTo(-14,hy+18,-12,hy-2,-5,hy-17); ctx.closePath(); ctx.fill();
@@ -813,7 +925,6 @@ class Fighter {
       ctx.beginPath(); ctx.arc(0,hy-10,14,Math.PI,0); ctx.fill();
       ctx.fillStyle=c2; ctx.fillRect(-15,hy-5,30,6);
     } else if (hs==='stylish') {
-      // そよ: スタイリッシュな細い女子
       ctx.fillStyle=hc;
       ctx.beginPath(); ctx.arc(0,hy-10,13,Math.PI,0); ctx.fill();
       ctx.beginPath(); ctx.moveTo(6,hy-20); ctx.bezierCurveTo(15,hy-24,19,hy-15,16,hy-8);
@@ -823,7 +934,6 @@ class Fighter {
       ctx.fillStyle=c2; ctx.fillRect(-13,hy-7,26,4);
       ctx.fillStyle='#ffee44'; ctx.beginPath(); ctx.arc(12,hy-12,3.5,0,Math.PI*2); ctx.fill();
     } else if (hs==='longglasses') {
-      // おかあさん: 長い髪・メガネの女性
       ctx.fillStyle=hc;
       ctx.beginPath(); ctx.moveTo(-12,hy-18); ctx.bezierCurveTo(-23,hy-2,-25,hy+22,-17,hy+48);
       ctx.lineTo(-10,hy+46); ctx.bezierCurveTo(-14,hy+20,-12,hy-2,-4,hy-19); ctx.closePath(); ctx.fill();
@@ -832,7 +942,6 @@ class Fighter {
       ctx.beginPath(); ctx.arc(0,hy-12,15,Math.PI,0); ctx.fill();
       ctx.fillStyle=c2; ctx.fillRect(-15,hy-7,30,5);
     } else if (hs==='cap') {
-      // おとうさん: キャップ
       ctx.fillStyle='#FFCC99'; ctx.fillRect(-15,hy-2,5,7); ctx.fillRect(10,hy-2,5,7);
       ctx.fillStyle=hc; ctx.beginPath(); ctx.arc(0,hy-8,14,Math.PI,0); ctx.fill();
       ctx.fillRect(-14,hy-14,28,7);
@@ -842,7 +951,6 @@ class Fighter {
       ctx.fillStyle=c2; ctx.fillRect(-18,hy-7,36,6);
     }
 
-    // Eyes
     if (s==='hurt'||s==='dead') {
       ctx.strokeStyle='#333'; ctx.lineWidth=2;
       ctx.beginPath(); ctx.moveTo(3,hy-4); ctx.lineTo(9,hy+1);
@@ -851,7 +959,6 @@ class Fighter {
       ctx.fillStyle='#222'; ctx.fillRect(4,hy-5,5,4);
     }
 
-    // Glasses
     if (hs==='cap') {
       ctx.strokeStyle='#666'; ctx.lineWidth=1.5;
       ctx.beginPath(); ctx.arc(6,hy-3,5,0,Math.PI*2); ctx.stroke();
@@ -1011,13 +1118,18 @@ function drawIntro() {
   ctx.fillStyle='#ffdd00'; ctx.fillText('大乱闘　ウエダファミリー',W/2,150);
   ctx.font='18px sans-serif'; ctx.fillStyle='#aaa';
   ctx.fillText('対戦格闘ゲーム　全5キャラ',W/2,195);
-  ctx.font='14px monospace'; ctx.fillStyle='#888';
-  ctx.fillText('A/D 移動   W ジャンプ   S しゃがみ',W/2,248);
-  ctx.fillText('J パンチ   K キック   L ガード',W/2,270);
-  ctx.fillStyle='#ffaa00'; ctx.fillText('Space: 必殺技ゲージMAXで必殺技発動！',W/2,294);
+  if (IS_TOUCH) {
+    ctx.font='16px sans-serif'; ctx.fillStyle='#888';
+    ctx.fillText('必殺技ゲージMAXで必殺技発動！',W/2,240);
+  } else {
+    ctx.font='14px monospace'; ctx.fillStyle='#888';
+    ctx.fillText('A/D 移動   W ジャンプ   S しゃがみ',W/2,248);
+    ctx.fillText('J パンチ   K キック   L ガード',W/2,270);
+    ctx.fillStyle='#ffaa00'; ctx.fillText('Space: 必殺技ゲージMAXで必殺技発動！',W/2,294);
+  }
   if (Math.floor(Date.now()/500)%2) {
-    ctx.font='bold 26px sans-serif'; ctx.fillStyle='#ffdd00';
-    ctx.fillText('SPACE か ENTER でスタート',W/2,380);
+    ctx.font='bold 28px sans-serif'; ctx.fillStyle='#ffdd00';
+    ctx.fillText(IS_TOUCH ? 'タップしてスタート' : 'SPACE か ENTER でスタート',W/2,370);
   }
 }
 
@@ -1027,7 +1139,7 @@ function drawCharSelect() {
   ctx.fillStyle='#ffdd00';
   ctx.fillText(selectStep===0?'あなたのキャラを選択':'対戦相手を選択',W/2,38);
   ctx.font='13px sans-serif'; ctx.fillStyle='#888';
-  ctx.fillText('← → で選択　　Space / Enter で決定',W/2,62);
+  ctx.fillText(IS_TOUCH ? 'タップして選択 / 決定で確定' : '← → で選択　　Space / Enter で決定',W/2,62);
 
   const PW=136, PH=272, GAP=20, startX=20;
   CHAR_LIST.forEach((def,idx)=>{
@@ -1147,10 +1259,8 @@ function loop() {
     const i2=cpuCtrl.update();
     p1.update(p2,i1); p2.update(p1,i2);
 
-    // Spawn specials
     if (p1.specialFired){p1.specialFired=false;spawnSpecialEffect(p1,p2);}
     if (p2.specialFired){p2.specialFired=false;spawnSpecialEffect(p2,p1);}
-    // Spawn baseballs
     if (p1.punchFired&&p1.def.punchIsProjectile){p1.punchFired=false;spawnBaseball(p1);}
     if (p2.punchFired&&p2.def.punchIsProjectile){p2.punchFired=false;spawnBaseball(p2);}
 
@@ -1158,7 +1268,6 @@ function loop() {
     updateHurdles(p1,p2);
     updateWords(p1,p2);
 
-    // Gorilla update & collision
     if (activeGorilla) {
       activeGorilla.update();
       if (activeGorilla&&activeGorilla.t>0&&!activeGorilla.atkHit) {
@@ -1212,13 +1321,14 @@ function loop() {
   drawHUD();
   drawFlashMsg();
   drawSpecialBanner();
-
-  ctx.fillStyle='rgba(255,255,255,0.25)'; ctx.font='11px monospace'; ctx.textAlign='center';
-  ctx.fillText('A/D 移動  W ジャンプ  S しゃがみ  J パンチ  K キック  L ガード  Space 必殺技',W/2,H-8);
+  if (!IS_TOUCH) {
+    ctx.fillStyle='rgba(255,255,255,0.25)'; ctx.font='11px monospace'; ctx.textAlign='center';
+    ctx.fillText('A/D 移動  W ジャンプ  S しゃがみ  J パンチ  K キック  L ガード  Space 必殺技',W/2,H-8);
+  }
 }
 
 // ============================================================
-// UNIT TESTS — URL に ?test を付けて開くと実行: street-brawler.html?test
+// UNIT TESTS — URL に ?test を付けて開くと実行: street-brawler-mobile.html?test
 // ============================================================
 if (location.search.includes('test')) {
   // 音を無効化

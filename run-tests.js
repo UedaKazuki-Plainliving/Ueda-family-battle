@@ -22,8 +22,13 @@ const ctx2d = new Proxy({}, {
 
 let capturedHTML = '';
 
+const mockElement = {
+  getContext: () => ctx2d, width: 800, height: 450,
+  addEventListener: noop, removeEventListener: noop,
+  style: {}, classList: { add: noop, remove: noop }
+};
 const mockDocument = {
-  getElementById: () => ({ getContext: () => ctx2d, width: 800, height: 450 }),
+  getElementById: () => mockElement,
   addEventListener: noop,
   createElement(tag) {
     if (tag !== 'div') return { style: {}, innerHTML: '' };
@@ -47,6 +52,7 @@ const mockAudioCtx = {
 const sandbox = vm.createContext({
   document:  mockDocument,
   window:    { AudioContext: function(){ return mockAudioCtx; }, webkitAudioContext: function(){ return mockAudioCtx; } },
+  navigator: { maxTouchPoints: 0 },
   AudioContext: function() { return mockAudioCtx; },
   webkitAudioContext: function() { return mockAudioCtx; },
   requestAnimationFrame: noop,

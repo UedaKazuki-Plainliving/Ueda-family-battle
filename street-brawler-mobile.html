@@ -78,6 +78,7 @@
 </div>
 <script>
 'use strict';
+const IS_TOUCH = ('ontouchstart' in window) || navigator.maxTouchPoints > 0;
 const canvas = document.getElementById('game');
 const ctx = canvas.getContext('2d');
 const W = 800, H = 450, GROUND = 340;
@@ -162,11 +163,18 @@ canvas.addEventListener('pointerdown', e => {
 });
 
 // Show/hide fight vs nav controls
-setInterval(() => {
-  const inFight = phase === 'fight' || phase === 'roundend' || phase === 'countdown';
-  document.getElementById('fight-ctrls').style.display = inFight ? 'block' : 'none';
-  document.getElementById('nav-ctrls').style.display   = inFight ? 'none'  : 'flex';
-}, 80);
+if (IS_TOUCH) {
+  setInterval(() => {
+    const inFight = phase === 'fight' || phase === 'roundend' || phase === 'countdown';
+    document.getElementById('fight-ctrls').style.display = inFight ? 'block' : 'none';
+    document.getElementById('nav-ctrls').style.display   = inFight ? 'none'  : 'flex';
+  }, 80);
+} else {
+  document.getElementById('fight-ctrls').style.display = 'none';
+  document.getElementById('nav-ctrls').style.display   = 'none';
+  canvas.style.width  = '';
+  canvas.style.height = '';
+}
 
 // ---- Character Definitions ----
 const CHARS = {
@@ -1110,11 +1118,18 @@ function drawIntro() {
   ctx.fillStyle='#ffdd00'; ctx.fillText('大乱闘　ウエダファミリー',W/2,150);
   ctx.font='18px sans-serif'; ctx.fillStyle='#aaa';
   ctx.fillText('対戦格闘ゲーム　全5キャラ',W/2,195);
-  ctx.font='16px sans-serif'; ctx.fillStyle='#888';
-  ctx.fillText('必殺技ゲージMAXで必殺技発動！',W/2,240);
+  if (IS_TOUCH) {
+    ctx.font='16px sans-serif'; ctx.fillStyle='#888';
+    ctx.fillText('必殺技ゲージMAXで必殺技発動！',W/2,240);
+  } else {
+    ctx.font='14px monospace'; ctx.fillStyle='#888';
+    ctx.fillText('A/D 移動   W ジャンプ   S しゃがみ',W/2,248);
+    ctx.fillText('J パンチ   K キック   L ガード',W/2,270);
+    ctx.fillStyle='#ffaa00'; ctx.fillText('Space: 必殺技ゲージMAXで必殺技発動！',W/2,294);
+  }
   if (Math.floor(Date.now()/500)%2) {
     ctx.font='bold 28px sans-serif'; ctx.fillStyle='#ffdd00';
-    ctx.fillText('タップしてスタート',W/2,370);
+    ctx.fillText(IS_TOUCH ? 'タップしてスタート' : 'SPACE か ENTER でスタート',W/2,370);
   }
 }
 
@@ -1124,7 +1139,7 @@ function drawCharSelect() {
   ctx.fillStyle='#ffdd00';
   ctx.fillText(selectStep===0?'あなたのキャラを選択':'対戦相手を選択',W/2,38);
   ctx.font='13px sans-serif'; ctx.fillStyle='#888';
-  ctx.fillText('タップして選択 / 決定で確定',W/2,62);
+  ctx.fillText(IS_TOUCH ? 'タップして選択 / 決定で確定' : '← → で選択　　Space / Enter で決定',W/2,62);
 
   const PW=136, PH=272, GAP=20, startX=20;
   CHAR_LIST.forEach((def,idx)=>{
@@ -1306,6 +1321,10 @@ function loop() {
   drawHUD();
   drawFlashMsg();
   drawSpecialBanner();
+  if (!IS_TOUCH) {
+    ctx.fillStyle='rgba(255,255,255,0.25)'; ctx.font='11px monospace'; ctx.textAlign='center';
+    ctx.fillText('A/D 移動  W ジャンプ  S しゃがみ  J パンチ  K キック  L ガード  Space 必殺技',W/2,H-8);
+  }
 }
 
 // ============================================================
