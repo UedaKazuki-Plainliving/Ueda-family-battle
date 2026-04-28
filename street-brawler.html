@@ -218,12 +218,14 @@ canvas.addEventListener('pointerdown', e => {
   }
   if (phase === 'charselect') {
     const rect = canvas.getBoundingClientRect();
-    const scaleX = W / rect.width;
+    const scaleX = W / rect.width, scaleY2 = H / rect.height;
     const tx = (e.clientX - rect.left) * scaleX;
-    const PW=136, GAP=20, startX=20;
+    const tcy = (e.clientY - rect.top) * scaleY2;
+    const CS_COLS=4, CS_PW=190, CS_PH=185, CS_GAP=8, CS_SX=8, CS_SY=68;
     for (let idx=0; idx<CHAR_LIST.length; idx++) {
-      const px = startX + idx*(PW+GAP);
-      if (tx >= px && tx <= px+PW) {
+      const col=idx%CS_COLS, row=Math.floor(idx/CS_COLS);
+      const px=CS_SX+col*(CS_PW+CS_GAP), py=CS_SY+row*(CS_PH+CS_GAP);
+      if (tx>=px&&tx<=px+CS_PW&&tcy>=py&&tcy<=py+CS_PH) {
         if (gameMode==='net') selectedCharIdx=idx;
         else if (selectStep===0) selectedCharIdx=idx;
         else cpuCharIdx=idx;
@@ -2179,9 +2181,10 @@ function drawCharSelect() {
   ctx.fillText(IS_TOUCH ? 'タップして選択 / 決定で確定' : '← → で選択　　Space / Enter で決定',W/2,62);
   drawBackBtn();
 
-  const PW=136, PH=272, GAP=20, startX=20;
+  const CS_COLS=4, PW=190, PH=185, GAP=8, startX=8, startY=68;
   CHAR_LIST.forEach((def,idx)=>{
-    const px=startX+idx*(PW+GAP);
+    const col=idx%CS_COLS, row=Math.floor(idx/CS_COLS);
+    const px=startX+col*(PW+GAP), py=startY+row*(PH+GAP);
     const isP1=idx===selectedCharIdx;
     const isCPU=idx===cpuCharIdx;
     const isNetOpp=gameMode==='net'&&idx===netOppCharIdx;
@@ -2191,36 +2194,37 @@ function drawCharSelect() {
     ctx.strokeStyle=cursor?(blink?'#ffdd00':'#ff8800'):locked?'#00ccee':isNetOpp?'#f66':'#444';
     ctx.lineWidth=cursor?3:locked?2:isNetOpp?2:1.5;
     ctx.fillStyle=cursor?'rgba(255,200,0,0.07)':locked?'rgba(0,180,255,0.05)':isNetOpp?'rgba(255,80,80,0.05)':'rgba(255,255,255,0.02)';
-    ctx.fillRect(px,78,PW,PH); ctx.strokeRect(px,78,PW,PH);
+    ctx.fillRect(px,py,PW,PH); ctx.strokeRect(px,py,PW,PH);
 
-    ctx.save(); ctx.translate(px+PW/2,240);
-    const sc=def.scale*0.82; ctx.scale(sc,sc);
+    ctx.save(); ctx.translate(px+PW/2, py+108);
+    const sc=def.scale*0.64; ctx.scale(sc,sc);
     const dummy=Object.create(Fighter.prototype);
     dummy.def=def; dummy.state='idle'; dummy.st=0;
     dummy.af=Math.floor(Date.now()/200)%2; dummy.atick=0;
     dummy._shape.call(dummy); ctx.restore();
 
-    ctx.font='bold 14px sans-serif'; ctx.textAlign='center';
-    ctx.fillStyle=def.c1; ctx.fillText(def.name,px+PW/2,290);
-    ctx.font='11px sans-serif'; ctx.fillStyle='#ccc';
-    ctx.fillText(def.desc,px+PW/2,306);
-    ctx.font='bold 10px sans-serif'; ctx.fillStyle='#ffaa00';
-    ctx.fillText('💥'+def.specialName,px+PW/2,320);
-    ctx.font='10px sans-serif'; ctx.fillStyle='#888';
-    def.flavor.forEach((line,li)=>ctx.fillText(line,px+PW/2,334+li*13));
+    ctx.font='bold 13px sans-serif'; ctx.textAlign='center';
+    ctx.fillStyle=def.c1; ctx.fillText(def.name, px+PW/2, py+140);
+    ctx.font='10px sans-serif'; ctx.fillStyle='#ccc';
+    ctx.fillText(def.desc, px+PW/2, py+154);
+    ctx.font='bold 9px sans-serif'; ctx.fillStyle='#ffaa00';
+    ctx.fillText('💥'+def.specialName, px+PW/2, py+166);
+    ctx.font='bold 9px sans-serif'; ctx.fillStyle='#cc88ff';
+    ctx.fillText('★'+def.superName, px+PW/2, py+178);
     ctx.font='bold 12px sans-serif'; ctx.textAlign='center';
+    const labelY=py+15;
     if (gameMode==='net') {
-      if (locked){ctx.fillStyle='#00ccee';ctx.fillText(`✓ P${netPlayerNum}`,px+PW/2,93);}
-      else if (isP1){ctx.fillStyle='#ffdd00';ctx.fillText(`▶ P${netPlayerNum}`,px+PW/2,93);}
-      else if (isNetOpp){const o=netPlayerNum===1?2:1;ctx.fillStyle='#f88';ctx.fillText(`▶ P${o}`,px+PW/2,93);}
-      else {ctx.fillStyle='#555';ctx.fillText('',px+PW/2,93);}
+      if (locked){ctx.fillStyle='#00ccee';ctx.fillText(`✓ P${netPlayerNum}`,px+PW/2,labelY);}
+      else if (isP1){ctx.fillStyle='#ffdd00';ctx.fillText(`▶ P${netPlayerNum}`,px+PW/2,labelY);}
+      else if (isNetOpp){const o=netPlayerNum===1?2:1;ctx.fillStyle='#f88';ctx.fillText(`▶ P${o}`,px+PW/2,labelY);}
+      else {ctx.fillStyle='#555';ctx.fillText('',px+PW/2,labelY);}
     } else if (selectStep===0) {
       ctx.fillStyle=isP1?'#ffdd00':'#555';
-      ctx.fillText(isP1?'▶ P1':'',px+PW/2,93);
+      ctx.fillText(isP1?'▶ P1':'',px+PW/2,labelY);
     } else {
-      if (locked){ctx.fillStyle='#00ccee';ctx.fillText('✓ P1',px+PW/2,93);}
-      else if (isCPU){ctx.fillStyle='#ffdd00';ctx.fillText(gameMode==='2p'?'▶ P2':'▶ CPU',px+PW/2,93);}
-      else {ctx.fillStyle='#555';ctx.fillText('',px+PW/2,93);}
+      if (locked){ctx.fillStyle='#00ccee';ctx.fillText('✓ P1',px+PW/2,labelY);}
+      else if (isCPU){ctx.fillStyle='#ffdd00';ctx.fillText(gameMode==='2p'?'▶ P2':'▶ CPU',px+PW/2,labelY);}
+      else {ctx.fillStyle='#555';ctx.fillText('',px+PW/2,labelY);}
     }
   });
 
