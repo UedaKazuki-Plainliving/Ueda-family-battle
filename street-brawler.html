@@ -648,7 +648,7 @@ class Gorilla {
 // ---- Fighter ----
 class Fighter {
   constructor(x,facingRight,def) {
-    this.x=x; this.y=GROUND; this.vy=0;
+    this.x=x; this.y=GROUND; this.vy=0; this.airVx=0;
     this.dir=facingRight?1:-1; this.def=def;
     this.hp=100; this.maxHp=100;
     this.state='idle'; this.st=0;
@@ -783,7 +783,11 @@ class Fighter {
 
     if (!this.onGround) {
       this.vy+=this.def.gravity; this.y+=this.vy;
-      if (this.y>=GROUND){this.y=GROUND;this.vy=0;this.onGround=true;
+      // 空中横移動: キー入力で上書き、なければジャンプ時の初速を維持
+      if (inp.left) this.airVx=-this.def.walkSpd*0.9;
+      else if (inp.right) this.airVx=this.def.walkSpd*0.9;
+      this.x+=this.airVx;
+      if (this.y>=GROUND){this.y=GROUND;this.vy=0;this.onGround=true;this.airVx=0;
         if (this.state==='jump'||this.state==='jatk'||this.state==='jkick'){this.state='idle';this.st=0;}}
     }
     const atk=['punch','kick','jatk','jkick'].includes(this.state);
@@ -815,20 +819,13 @@ class Fighter {
     else if (ok&&inp.kick&&!this.onGround&&this.state!=='jkick'){this.state='jkick';this.st=0;this.atkHit=false;beep(120,'square',0.1,0.13);}
     else if (ok&&inp.up&&this.onGround){
       this.vy=this.def.jumpVel;this.onGround=false;this.state='jump';this.st=0;
+      this.airVx=inp.right?this.def.walkSpd*1.4:inp.left?-this.def.walkSpd*1.4:0;
       beep(440,'sine',0.1,0.12);
-      if (inp.left) this.x-=this.def.walkSpd*1.4;
-      if (inp.right) this.x+=this.def.walkSpd*1.4;
     }
     else if (inp.down&&this.onGround){this.state='crouch';}
     else if (inp.left&&this.onGround){this.x-=this.def.walkSpd;this.state='walk';this.comboCount=0;}
     else if (inp.right&&this.onGround){this.x+=this.def.walkSpd;this.state='walk';this.comboCount=0;}
     else if (this.onGround&&this.state!=='block'){this.state='idle';this.comboCount=0;}
-
-    // Air horizontal movement (diagonal jump)
-    if (!this.onGround&&(this.state==='jump'||this.state==='jatk'||this.state==='jkick'||this.state==='hurt')) {
-      if (inp.left)  this.x-=this.def.walkSpd*0.9;
-      if (inp.right) this.x+=this.def.walkSpd*0.9;
-    }
 
     this.x=Math.max(55,Math.min(W-55,this.x));
     const MIN_DIST=54;
