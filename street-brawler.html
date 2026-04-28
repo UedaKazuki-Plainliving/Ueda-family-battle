@@ -86,6 +86,7 @@ const IS_TOUCH = ('ontouchstart' in window) || navigator.maxTouchPoints > 0;
 const canvas = document.getElementById('game');
 const ctx = canvas.getContext('2d');
 const W = 800, H = 450, GROUND = 340;
+const EXIT_BTN = {x:5, y:5, w:52, h:24};
 
 // ---- Audio ----
 const audio = new (window.AudioContext || window.webkitAudioContext)();
@@ -102,7 +103,13 @@ function beep(freq, type, dur, vol = 0.25) {
 
 // ---- Input ----
 const keys = {};
-document.addEventListener('keydown', e => { keys[e.code] = true; e.preventDefault(); });
+document.addEventListener('keydown', e => {
+  if (e.code === 'Escape') {
+    const inFight = phase==='fight'||phase==='roundend'||phase==='countdown';
+    if (inFight) { exitToMenu(); return; }
+  }
+  keys[e.code] = true; e.preventDefault();
+});
 document.addEventListener('keyup',   e => { keys[e.code] = false; });
 function keyOnce(code) { if (keys[code]) { keys[code] = false; return true; } return false; }
 
@@ -162,14 +169,30 @@ document.addEventListener('touchcancel', e => e.preventDefault(), {passive: fals
 // Canvas tap handler for charselect & intro
 canvas.addEventListener('pointerdown', e => {
   if (audio.state === 'suspended') audio.resume();
+  const inFight = phase==='fight'||phase==='roundend'||phase==='countdown';
+  if (inFight) {
+    const rect = canvas.getBoundingClientRect();
+    const ex = (e.clientX - rect.left) * (W / rect.width);
+    const ey = (e.clientY - rect.top)  * (H / rect.height);
+    if (ex>=EXIT_BTN.x&&ex<=EXIT_BTN.x+EXIT_BTN.w&&ey>=EXIT_BTN.y&&ey<=EXIT_BTN.y+EXIT_BTN.h) {
+      exitToMenu(); return;
+    }
+  }
   if (phase === 'intro') { keys['Enter'] = true; return; }
   if (phase === 'modeselect') {
     const rect = canvas.getBoundingClientRect();
     const scaleY = H / rect.height;
     const ty = (e.clientY - rect.top) * scaleY;
-    if (ty >= 180 && ty < 290) { gameMode='cpu'; beep(350,'sine',0.08); }
-    else if (ty >= 290 && ty < 400) { gameMode='2p'; beep(350,'sine',0.08); }
-    keys['Enter'] = true; return;
+    if (modeSelectStep === 1) {
+      // 難易度サブメニュー
+      if (ty >= 200 && ty < 260) { cpuDifficulty='weak'; beep(350,'sine',0.08); }
+      else if (ty >= 280 && ty < 340) { cpuDifficulty='normal'; beep(350,'sine',0.08); }
+      else if (ty >= 360 && ty < 420) { cpuDifficulty='strong'; beep(350,'sine',0.08); }
+      keys['Enter'] = true; return;
+    }
+    if (ty >= 180 && ty < 290) { gameMode='cpu'; beep(350,'sine',0.08); modeSelectStep=1; return; }
+    else if (ty >= 290 && ty < 400) { gameMode='2p'; beep(350,'sine',0.08); keys['Enter'] = true; }
+    return;
   }
   if (phase === 'charselect') {
     const rect = canvas.getBoundingClientRect();
@@ -1245,30 +1268,74 @@ class Fighter {
 class CPU {
   constructor(me,opp){this.me=me;this.opp=opp;this.timer=0;this.action='idle';}
   update() {
+    const diff = typeof cpuDifficulty !== 'undefined' ? cpuDifficulty : 'normal';
     const dist=Math.abs(this.me.x-this.opp.x);
+
+    // 弱い: 40%の確率で何もしない
+    if (diff === 'weak' && Math.random() < 0.4) {
+      return {punch:false,kick:false,left:false,right:false,up:false,down:false,block:false,special:false};
+    }
+
+    // 強い: 相手が攻撃中なら積極的にガード
+    if (diff === 'strong') {
+      const oppAtk = ['punch','kick','jatk','jkick','special'].includes(this.opp.state);
+      if (oppAtk && dist < 130 && Math.random() < 0.5) {
+        return {punch:false,kick:false,left:false,right:false,up:false,down:false,block:true,special:false};
+      }
+    }
+
     if (--this.timer<=0) {
       const fast=this.me.def.walkSpd>5;
-      this.timer=fast?8+Math.random()*15:18+Math.random()*28;
-      const r=Math.random();
-      if (dist<85)       this.action=r<0.35?'punch':r<0.6?'kick':r<0.75?'block':'back';
-      else if (dist<170) this.action=r<0.5?'fwd':r<0.7?'punch':r<0.8?'jump':'idle';
-      else               this.action=r<0.65?'fwd':r<0.8?'jump':'idle';
+      // 弱い: 反応が遅い・距離が近い時だけ行動
+      if (diff === 'weak') {
+        this.timer = 25 + Math.random() * 35;
+        const r = Math.random();
+        if (dist < 60) this.action = r < 0.6 ? 'punch' : r < 0.8 ? 'back' : 'idle';
+        else this.action = r < 0.5 ? 'fwd' : 'idle';
+      } else if (diff === 'strong') {
+        this.timer = fast ? 5 + Math.random() * 10 : 10 + Math.random() * 18;
+        const r = Math.random();
+        if (dist < 85)       this.action = r < 0.35 ? 'punch' : r < 0.55 ? 'kick' : r < 0.7 ? 'block' : 'back';
+        else if (dist < 200) this.action = r < 0.55 ? 'fwd' : r < 0.75 ? 'punch' : r < 0.85 ? 'jump' : 'idle';
+        else                 this.action = r < 0.7 ? 'fwd' : r < 0.85 ? 'jump' : 'idle';
+      } else {
+        this.timer=fast?8+Math.random()*15:18+Math.random()*28;
+        const r=Math.random();
+        if (dist<85)       this.action=r<0.35?'punch':r<0.6?'kick':r<0.75?'block':'back';
+        else if (dist<170) this.action=r<0.5?'fwd':r<0.7?'punch':r<0.8?'jump':'idle';
+        else               this.action=r<0.65?'fwd':r<0.8?'jump':'idle';
+      }
     }
     const toward=this.opp.x>this.me.x;
     const inp={punch:false,kick:false,left:false,right:false,up:false,down:false,block:false,special:false};
     const acc=this.me.def.id==='icchi'||this.me.def.id==='soyo'?0.78:0.68;
     if (Math.random()<acc) {
-      if (this.action==='punch') inp.punch=true;
-      else if (this.action==='kick') inp.kick=true;
-      else if (this.action==='fwd') inp[toward?'right':'left']=true;
-      else if (this.action==='back') inp[toward?'left':'right']=true;
-      else if (this.action==='jump'){inp.up=true;inp[toward?'right':'left']=true;}
-      else if (this.action==='block') inp.block=true;
+      // 弱い: パンチのみ、キックなし
+      if (diff === 'weak') {
+        if (this.action==='punch') inp.punch=true;
+        else if (this.action==='fwd') inp[toward?'right':'left']=true;
+        else if (this.action==='back') inp[toward?'left':'right']=true;
+      } else {
+        if (this.action==='punch') inp.punch=true;
+        else if (this.action==='kick') {
+          // 強い: 20%でキック使う
+          if (diff === 'strong' && Math.random() < 0.2) inp.kick=true;
+          else if (diff !== 'strong') inp.kick=true;
+          else inp.punch=true;
+        }
+        else if (this.action==='fwd') inp[toward?'right':'left']=true;
+        else if (this.action==='back') inp[toward?'left':'right']=true;
+        else if (this.action==='jump'){inp.up=true;inp[toward?'right':'left']=true;}
+        else if (this.action==='block') inp.block=true;
+      }
     }
     const full=this.me.specialGauge>=this.me.maxSpecialGauge;
-    if (full&&this.me.onGround&&this.me.state==='idle') {
+    // 弱い: 必殺技を使わない
+    if (diff !== 'weak' && full&&this.me.onGround&&this.me.state==='idle') {
       const useIt=this.me.def.id==='yuuri'?dist<220:true;
-      if (useIt&&Math.random()<0.6) inp.special=true;
+      // 強い: より積極的に必殺技を使う
+      const threshold = diff === 'strong' ? 0.75 : 0.6;
+      if (useIt&&Math.random()<threshold) inp.special=true;
     }
     return inp;
   }
@@ -1385,6 +1452,31 @@ function drawModeSelect() {
   ctx.fillStyle='#000'; ctx.fillRect(0,0,W,H);
   ctx.font='bold 36px sans-serif'; ctx.textAlign='center';
   ctx.fillStyle='#ffdd00'; ctx.fillText('モード選択',W/2,120);
+
+  if (modeSelectStep === 1) {
+    // 難易度選択サブメニュー (CPUモード選択後)
+    ctx.font='bold 22px sans-serif'; ctx.fillStyle='#fff';
+    ctx.fillText('CPU の強さを選んでください',W/2,170);
+    const diffs=[{id:'weak',label:'弱い',sub:'反応が遅い・必殺技なし'},{id:'normal',label:'普通',sub:'標準のAI'},{id:'strong',label:'強い',sub:'積極的にガード・必殺技を使う'}];
+    diffs.forEach((d,i)=>{
+      const bx=W/2-180, by=200+i*80, bw=360, bh=60;
+      const sel=cpuDifficulty===d.id;
+      ctx.strokeStyle=sel?'#ffdd00':'#555'; ctx.lineWidth=sel?3:1.5;
+      ctx.fillStyle=sel?'rgba(255,200,0,0.1)':'rgba(255,255,255,0.03)';
+      ctx.fillRect(bx,by,bw,bh); ctx.strokeRect(bx,by,bw,bh);
+      ctx.font='bold 22px sans-serif'; ctx.fillStyle=sel?'#ffdd00':'#aaa';
+      ctx.fillText(d.label,W/2,by+30);
+      ctx.font='12px sans-serif'; ctx.fillStyle='#777';
+      ctx.fillText(d.sub,W/2,by+50);
+      if (sel) { ctx.fillStyle='#ffdd00'; ctx.font='bold 16px sans-serif'; ctx.fillText('▶',bx+18,by+34); }
+    });
+    if (!IS_TOUCH) {
+      ctx.font='13px sans-serif'; ctx.fillStyle='#666'; ctx.textAlign='center';
+      ctx.fillText('↑↓ / W/S で選択  　1:弱い  2:普通  3:強い  　Space / Enter で決定',W/2,440);
+    }
+    return;
+  }
+
   const modes=[{id:'cpu',label:'1人プレイ（vs CPU）',sub:'AIと対戦'},{id:'2p',label:'2人プレイ（vs Player）',sub:'キーボードで2P対戦'}];
   modes.forEach((m,i)=>{
     const bx=W/2-180, by=180+i*110, bw=360, bh=80;
@@ -1466,8 +1558,14 @@ let wins=[0,0], roundNum=1;
 let flash={msg:'',t:0};
 let endTimer=0, selectedCharIdx=0, cpuCharIdx=1, selectStep=0;
 let gameMode='cpu'; // 'cpu' or '2p'
-let modeSelectStep=0; // 0=モード選択, 1以降=キャラ選択
+let modeSelectStep=0; // 0=モード選択, 1=難易度選択(CPUのみ)
+let cpuDifficulty='normal'; // 'weak', 'normal', 'strong'
 function showFlash(msg,dur){flash.msg=msg;flash.t=dur;}
+function exitToMenu(){
+  wins=[0,0]; roundNum=1; selectStep=0; modeSelectStep=0;
+  phase='modeselect';
+  try{beep(300,'sine',0.08);}catch(e){}
+}
 
 function startRound() {
   const p1def=CHAR_LIST[selectedCharIdx];
@@ -1503,10 +1601,25 @@ function loop() {
   }
   if (phase==='modeselect') {
     drawModeSelect();
-    if (keyOnce('ArrowUp')||keyOnce('KeyW')) { gameMode='cpu'; beep(350,'sine',0.08); }
-    if (keyOnce('ArrowDown')||keyOnce('KeyS')) { gameMode='2p'; beep(350,'sine',0.08); }
-    if (keyOnce('Space')||keyOnce('Enter')) {
-      phase='charselect'; selectStep=0; selectedCharIdx=0; cpuCharIdx=1; beep(440,'sine',0.12);
+    if (modeSelectStep === 1) {
+      // 難易度選択
+      const diffs = ['weak','normal','strong'];
+      const curIdx = diffs.indexOf(cpuDifficulty);
+      if (keyOnce('ArrowUp')||keyOnce('KeyW')) { cpuDifficulty=diffs[Math.max(0,curIdx-1)]; beep(350,'sine',0.08); }
+      if (keyOnce('ArrowDown')||keyOnce('KeyS')) { cpuDifficulty=diffs[Math.min(2,curIdx+1)]; beep(350,'sine',0.08); }
+      if (keyOnce('Digit1')) { cpuDifficulty='weak'; beep(350,'sine',0.08); }
+      if (keyOnce('Digit2')) { cpuDifficulty='normal'; beep(350,'sine',0.08); }
+      if (keyOnce('Digit3')) { cpuDifficulty='strong'; beep(350,'sine',0.08); }
+      if (keyOnce('Space')||keyOnce('Enter')) {
+        modeSelectStep=0; phase='charselect'; selectStep=0; selectedCharIdx=0; cpuCharIdx=1; beep(440,'sine',0.12);
+      }
+    } else {
+      if (keyOnce('ArrowUp')||keyOnce('KeyW')) { gameMode='cpu'; beep(350,'sine',0.08); }
+      if (keyOnce('ArrowDown')||keyOnce('KeyS')) { gameMode='2p'; beep(350,'sine',0.08); }
+      if (keyOnce('Space')||keyOnce('Enter')) {
+        if (gameMode==='cpu') { modeSelectStep=1; beep(350,'sine',0.08); }
+        else { phase='charselect'; selectStep=0; selectedCharIdx=0; cpuCharIdx=1; beep(440,'sine',0.12); }
+      }
     }
     return;
   }
@@ -1595,7 +1708,7 @@ function loop() {
 
   if (phase==='roundend'||phase==='countdown') {
     if (phase==='roundend'&&--endTimer<=0) {
-      if (wins[0]>=2||wins[1]>=2){wins=[0,0];roundNum=1;selectStep=0;phase='modeselect';return;}
+      if (wins[0]>=2||wins[1]>=2){wins=[0,0];roundNum=1;selectStep=0;modeSelectStep=0;phase='modeselect';return;}
       roundNum++;startRound();phase='countdown';
       showFlash(`ROUND ${roundNum}`,80);
       setTimeout(()=>showFlash('FIGHT!',70),1200);
@@ -1612,10 +1725,137 @@ function loop() {
   drawHUD();
   drawFlashMsg();
   drawSpecialBanner();
+  drawExitButton();
   if (!IS_TOUCH) {
     ctx.fillStyle='rgba(255,255,255,0.25)'; ctx.font='11px monospace'; ctx.textAlign='center';
     ctx.fillText('A/D 移動  W ジャンプ  S しゃがみ  J パンチ  K キック  L ガード  Space 必殺技',W/2,H-8);
+    // P2 key mapping overlay (PC always visible during fight)
+    drawP2KeyHint();
   }
+  if (IS_TOUCH && gameMode === '2p') {
+    drawMobile2PControls();
+  }
+}
+
+function drawExitButton() {
+  ctx.fillStyle='rgba(0,0,0,0.6)';
+  ctx.fillRect(EXIT_BTN.x,EXIT_BTN.y,EXIT_BTN.w,EXIT_BTN.h);
+  ctx.fillStyle='#ff6666';
+  ctx.font='bold 13px sans-serif';
+  ctx.textAlign='left';
+  ctx.fillText('■ 終了',EXIT_BTN.x+5,EXIT_BTN.y+17);
+}
+
+function drawP2KeyHint() {
+  const txt = 'P2: ←↑→↓  Num1:殴 Num2:蹴 Num3:ガ Num0:必';
+  ctx.font = '12px monospace';
+  const tw = ctx.measureText(txt).width;
+  const bx = W - tw - 14, by = 72, bw = tw + 10, bh = 20;
+  ctx.fillStyle = 'rgba(0,0,0,0.55)';
+  ctx.fillRect(bx, by, bw, bh);
+  ctx.fillStyle = '#fff';
+  ctx.textAlign = 'left';
+  ctx.fillText(txt, bx + 5, by + 14);
+}
+
+// ---- Mobile 2P Canvas Controls ----
+// Touch tracking for 2P mobile: touches left of 400 → P1, right → P2
+const touch2PState = {p1:{},p2:{}};
+
+function initMobile2PTouch() {
+  function getCanvasCoords(touch) {
+    const rect = canvas.getBoundingClientRect();
+    return {
+      x: (touch.clientX - rect.left) * (W / rect.width),
+      y: (touch.clientY - rect.top)  * (H / rect.height)
+    };
+  }
+
+  // Button definitions for 2P mobile layout — delegate to shared function
+  function getButtons() { return getMobile2PButtons(); }
+
+  function hitTest(btn, cx, cy) {
+    const dx = cx - btn.cx, dy = cy - btn.cy;
+    return dx*dx + dy*dy <= btn.r * btn.r;
+  }
+
+  function handleTouch(e) {
+    e.preventDefault();
+    const buttons = getButtons();
+    // Reset all button keys
+    buttons.forEach(b => { keys[b.key] = false; });
+    // Set keys for active touches
+    for (let i = 0; i < e.touches.length; i++) {
+      const coords = getCanvasCoords(e.touches[i]);
+      buttons.forEach(b => {
+        if (hitTest(b, coords.x, coords.y)) keys[b.key] = true;
+      });
+    }
+  }
+
+  canvas.addEventListener('touchstart',  handleTouch, {passive:false});
+  canvas.addEventListener('touchmove',   handleTouch, {passive:false});
+  canvas.addEventListener('touchend',    handleTouch, {passive:false});
+  canvas.addEventListener('touchcancel', handleTouch, {passive:false});
+}
+
+function getMobile2PButtons() {
+  const R = 30;
+  return [
+    // P1 controls (left half)
+    {cx:60,  cy:390, r:R, key:'KeyA',  player:1, label:'◀'},
+    {cx:130, cy:390, r:R, key:'KeyD',  player:1, label:'▶'},
+    {cx:95,  cy:350, r:R, key:'KeyW',  player:1, label:'▲'},
+    {cx:230, cy:360, r:R, key:'KeyJ',  player:1, label:'殴'},
+    {cx:290, cy:360, r:R, key:'KeyK',  player:1, label:'蹴'},
+    {cx:230, cy:410, r:R, key:'KeyL',  player:1, label:'ガ'},
+    {cx:290, cy:410, r:R, key:'Space', player:1, label:'必'},
+    // P2 controls (right half)
+    {cx:W-60,  cy:390, r:R, key:'ArrowRight', player:2, label:'▶'},
+    {cx:W-130, cy:390, r:R, key:'ArrowLeft',  player:2, label:'◀'},
+    {cx:W-95,  cy:350, r:R, key:'ArrowUp',    player:2, label:'▲'},
+    {cx:W-230, cy:360, r:R, key:'Numpad1',    player:2, label:'殴'},
+    {cx:W-290, cy:360, r:R, key:'Numpad2',    player:2, label:'蹴'},
+    {cx:W-230, cy:410, r:R, key:'Numpad3',    player:2, label:'ガ'},
+    {cx:W-290, cy:410, r:R, key:'Numpad0',    player:2, label:'必'},
+  ];
+}
+
+function drawMobile2PControls() {
+  const buttons = getMobile2PButtons();
+  // Draw center divider line
+  ctx.strokeStyle = 'rgba(255,255,255,0.15)';
+  ctx.lineWidth = 1;
+  ctx.setLineDash([4,4]);
+  ctx.beginPath(); ctx.moveTo(W/2, 320); ctx.lineTo(W/2, H); ctx.stroke();
+  ctx.setLineDash([]);
+
+  // P1 label
+  ctx.fillStyle = 'rgba(0,200,255,0.7)'; ctx.font = 'bold 11px sans-serif'; ctx.textAlign = 'center';
+  ctx.fillText('P1', 40, 330);
+  // P2 label
+  ctx.fillStyle = 'rgba(255,150,0,0.7)';
+  ctx.fillText('P2', W-40, 330);
+
+  buttons.forEach(btn => {
+    const active = !!keys[btn.key];
+    const isP1 = btn.player === 1;
+    const baseColor = isP1 ? 'rgba(0,200,255,' : 'rgba(255,150,0,';
+    ctx.beginPath(); ctx.arc(btn.cx, btn.cy, btn.r, 0, Math.PI*2);
+    ctx.fillStyle = active ? baseColor+'0.55)' : baseColor+'0.18)';
+    ctx.fill();
+    ctx.strokeStyle = active ? baseColor+'0.9)' : baseColor+'0.4)';
+    ctx.lineWidth = 2; ctx.stroke();
+    ctx.fillStyle = '#fff'; ctx.font = 'bold 11px sans-serif'; ctx.textAlign = 'center';
+    ctx.fillText(btn.label, btn.cx, btn.cy + 4);
+  });
+}
+
+// Initialize 2P mobile touch if needed
+if (IS_TOUCH) {
+  // We call initMobile2PTouch lazily when gameMode is known
+  // But we always init so it's ready when needed
+  initMobile2PTouch();
 }
 
 // ============================================================
@@ -1808,148 +2048,179 @@ if (location.search.includes('test')) {
     eq(f.guardMode, true);
   });
 
-  // ---- 新機能テスト ----
+  // ---- 新機能テスト (feat/mechanics) ----
 
-  // Change 1: soyo jumpVel
   t('soyo: jumpVel が -19 に変更されている', () => eq(CHARS.soyo.jumpVel, -19));
 
-  // Change 2: しゃがみガードはjkickに負ける
   t('しゃがみガード: jkick はヒットする(ガード不能)', () => {
     const f = mkF('icchi', true, 300); f.state='crouch'; f.guardMode=true;
     f.takeHit({dmg:10, stun:16, push:0, type:'jkick'}, -1);
     if (f.hp === 100) throw new Error('crouch guard must not block jkick');
   });
 
-  // Change 3: 7連続ヒットでダウン状態
   t('7連続ヒットでダウン状態(state=down)になる', () => {
     const f = mkF('icchi', true, 300);
-    for (let i = 0; i < 6; i++) {
-      f.hitStun = 0;
-      f.takeHit({dmg:1, stun:1, push:0, type:'punch'}, -1);
-    }
-    f.hitStun = 0;
-    f.takeHit({dmg:1, stun:1, push:0, type:'punch'}, -1);
+    for (let i = 0; i < 6; i++) { f.hitStun = 0; f.takeHit({dmg:1, stun:1, push:0, type:'punch'}, -1); }
+    f.hitStun = 0; f.takeHit({dmg:1, stun:1, push:0, type:'punch'}, -1);
     eq(f.state, 'down');
   });
 
-  // Change 3: downrise後にidleへ遷移
   t('down状態が終わるとdownriseに遷移する', () => {
-    const f = mkF('icchi', true, 300);
-    f.state = 'down'; f.st = 0;
+    const f = mkF('icchi', true, 300); f.state = 'down'; f.st = 0;
     const opp = mkF('yuuri', false, 500);
-    // 90フレーム分 update する
     for (let i = 0; i < 90; i++) f.update(opp, mkI());
     eq(f.state, 'downrise');
   });
 
-  // Change 3: downriseがidleに遷移
   t('downrise状態が終わるとidleに遷移する', () => {
-    const f = mkF('icchi', true, 300);
-    f.state = 'downrise'; f.st = 0;
+    const f = mkF('icchi', true, 300); f.state = 'downrise'; f.st = 0;
     const opp = mkF('yuuri', false, 500);
     for (let i = 0; i < 30; i++) f.update(opp, mkI());
     eq(f.state, 'idle');
   });
 
-  // Change 5: downrise終了後に無敵フレーム付与
   t('downrise終了後にinvincFrames=60が付与される', () => {
-    const f = mkF('icchi', true, 300);
-    f.state = 'downrise'; f.st = 0;
+    const f = mkF('icchi', true, 300); f.state = 'downrise'; f.st = 0;
     const opp = mkF('yuuri', false, 500);
     for (let i = 0; i < 30; i++) f.update(opp, mkI());
-    eq(f.state, 'idle');
     if (f.invincFrames < 60) throw new Error('invincFrames should be 60 after downrise, got ' + f.invincFrames);
   });
 
-  // Change 5: invincFrames中はhitしない
   t('invincFrames中はtakeHitがfalseを返す', () => {
-    const f = mkF('icchi', true, 300);
-    f.invincFrames = 30;
+    const f = mkF('icchi', true, 300); f.invincFrames = 30;
     const result = f.takeHit({dmg:10, stun:16, push:0, type:'punch'}, -1);
-    eq(result, false);
-    eq(f.hp, 100);
+    eq(result, false); eq(f.hp, 100);
   });
 
-  // Change 4: コーナー付近でディフェンダーのとき、攻撃者が後退する
   t('コーナー付近のディフェンダー → 攻撃者が後退する', () => {
-    const defender = mkF('icchi', true, 50); // x=50 < 80 = near wall
+    const defender = mkF('icchi', true, 50);
     const attacker = mkF('yuuri', false, 150);
     fighters[0] = defender; fighters[1] = attacker;
     const attackerXBefore = attacker.x;
     defender.takeHit({dmg:5, stun:1, push:20, type:'punch'}, 1);
-    // ディフェンダーは動かず、攻撃者が後退する
     if (Math.abs(attacker.x - attackerXBefore) < 1) throw new Error('attacker should be pushed back in corner');
-    // ディフェンダーのxは変わらない（コーナーなので）
     eq(defender.x, 50);
   });
 
-  // Change 6: otousan必殺技が3連続ことばを発射
   t('otousan必殺技: 3回specialFiredが発生する(st=15,30,45)', () => {
-    const f = mkF('otousan', true, 300);
-    const opp = mkF('icchi', false, 500);
-    // 必殺技ゲージをMAXにして必殺技状態に設定
+    const f = mkF('otousan', true, 300); const opp = mkF('icchi', false, 500);
     f.state = 'special'; f.st = 0; f.specialFired = false;
     let fireCount = 0;
-    // 60フレーム分update、specialFiredがtrueになった回数を数える
     for (let frame = 0; frame < 62; frame++) {
       f.update(opp, mkI());
       if (f.specialFired) { fireCount++; f.specialFired = false; }
-      // stateがidleになったら終了
       if (f.state !== 'special') break;
     }
     eq(fireCount, 3);
   });
 
-  // Change 7: okaasanゴリラ攻撃が立ちガードでブロックできる
   t('okaasanゴリラ攻撃: 立ちガードでブロック可能(type=punch)', () => {
     const f = mkF('icchi', true, 300); f.state='block'; f.guardMode=true;
-    // ゴリラのhitはtype:'punch'になったのでstandGで防げる
     const result = f.takeHit({dmg:12, stun:20, push:18, type:'punch'}, -1);
-    eq(result, true);
-    eq(f.hp, 100); // ダメージなし
+    eq(result, true); eq(f.hp, 100);
   });
 
-  // Change 8: ジャンプ中攻撃でvy・重力が維持される
   t('jatk突入時にvyがリセットされない(空中パンチ)', () => {
     const f = mkF('icchi', true, 300);
     f.onGround = false; f.y = GROUND - 80; f.vy = -10;
     f.state = 'jatk'; f.st = 0; f.atkHit = false;
-    // vyが0にリセットされていないことを確認
-    if (f.vy === 0) throw new Error('vy should not be 0 when entering jatk from jump, got ' + f.vy);
+    if (f.vy === 0) throw new Error('vy should not be 0 when entering jatk, got ' + f.vy);
   });
+
   t('jatk中は毎フレームvy+=gravity(重力が継続する)', () => {
-    const f = mkF('icchi', true, 300);
-    const opp = mkF('yuuri', false, 500);
+    const f = mkF('icchi', true, 300); const opp = mkF('yuuri', false, 500);
     f.onGround = false; f.y = GROUND - 80; f.vy = -10;
     f.state = 'jatk'; f.st = 0; f.atkHit = false;
-    const vyBefore = f.vy;
-    f.update(opp, mkI());
-    const expected = vyBefore + f.def.gravity;
-    near(f.vy, expected, 'vy after one jatk frame');
+    const vyBefore = f.vy; f.update(opp, mkI());
+    near(f.vy, vyBefore + f.def.gravity, 'vy after one jatk frame');
   });
+
   t('jkick突入時にvyがリセットされない(空中キック)', () => {
     const f = mkF('icchi', true, 300);
     f.onGround = false; f.y = GROUND - 80; f.vy = -8;
     f.state = 'jkick'; f.st = 0; f.atkHit = false;
-    if (f.vy === 0) throw new Error('vy should not be 0 when entering jkick from jump, got ' + f.vy);
+    if (f.vy === 0) throw new Error('vy should not be 0 when entering jkick, got ' + f.vy);
   });
+
   t('jatk着地時にidleへ遷移する', () => {
-    const f = mkF('icchi', true, 300);
-    const opp = mkF('yuuri', false, 500);
-    f.onGround = false; f.y = GROUND - 2; f.vy = 5; // ほぼ着地直前
+    const f = mkF('icchi', true, 300); const opp = mkF('yuuri', false, 500);
+    f.onGround = false; f.y = GROUND - 2; f.vy = 5;
     f.state = 'jatk'; f.st = 2; f.atkHit = false;
-    f.update(opp, mkI());
-    eq(f.state, 'idle');
-    eq(f.onGround, true);
+    f.update(opp, mkI()); eq(f.state, 'idle'); eq(f.onGround, true);
   });
+
   t('jkick着地時にidleへ遷移する', () => {
-    const f = mkF('icchi', true, 300);
-    const opp = mkF('yuuri', false, 500);
+    const f = mkF('icchi', true, 300); const opp = mkF('yuuri', false, 500);
     f.onGround = false; f.y = GROUND - 2; f.vy = 5;
     f.state = 'jkick'; f.st = 2; f.atkHit = false;
-    f.update(opp, mkI());
-    eq(f.state, 'idle');
-    eq(f.onGround, true);
+    f.update(opp, mkI()); eq(f.state, 'idle'); eq(f.onGround, true);
+  });
+
+  // ---- 新機能テスト (feat/controls) ----
+
+  t('cpuDifficulty: 変数が存在しデフォルトは normal', () => eq(cpuDifficulty, 'normal'));
+
+  t('CPU 弱い: 必殺技を使わない', () => {
+    const saved = cpuDifficulty; cpuDifficulty = 'weak';
+    try {
+      const me = mkF('icchi', false, 600); me.specialGauge = 100; me.state = 'idle'; me.onGround = true;
+      const opp = mkF('yuuri', true, 500); const cpu = new CPU(me, opp);
+      for (let i = 0; i < 200; i++) {
+        me.specialGauge = 100; me.state = 'idle'; me.onGround = true;
+        const inp = cpu.update();
+        if (inp.special) throw new Error('weak CPU must never use special');
+      }
+    } finally { cpuDifficulty = saved; }
+  });
+
+  t('CPU 弱い: キックを使わない', () => {
+    const saved = cpuDifficulty; cpuDifficulty = 'weak';
+    try {
+      const me = mkF('icchi', false, 90); const opp = mkF('yuuri', true, 90);
+      const cpu = new CPU(me, opp);
+      for (let i = 0; i < 500; i++) {
+        me.state = 'idle'; me.onGround = true; me.hitStun = 0; me.blockStun = 0;
+        const inp = cpu.update();
+        if (inp.kick) throw new Error('weak CPU must never use kick');
+      }
+    } finally { cpuDifficulty = saved; }
+  });
+
+  t('drawP2KeyHint: P2キー表示テキストが定義されている', () => {
+    if (typeof drawP2KeyHint !== 'function') throw new Error('drawP2KeyHint function not found');
+  });
+
+  t('getMobile2PButtons: P1とP2のボタンが存在する', () => {
+    const btns = getMobile2PButtons();
+    const p1btns = btns.filter(b => b.player === 1);
+    const p2btns = btns.filter(b => b.player === 2);
+    if (p1btns.length === 0) throw new Error('P1 buttons missing');
+    if (p2btns.length === 0) throw new Error('P2 buttons missing');
+  });
+
+  t('getMobile2PButtons: P1ボタンはx<400に配置', () => {
+    const btns = getMobile2PButtons();
+    btns.filter(b => b.player === 1).forEach(b => { if (b.cx >= 400) throw new Error(`P1 button cx=${b.cx} must be < 400`); });
+  });
+
+  t('getMobile2PButtons: P2ボタンはx>=400に配置', () => {
+    const btns = getMobile2PButtons();
+    btns.filter(b => b.player === 2).forEach(b => { if (b.cx < 400) throw new Error(`P2 button cx=${b.cx} must be >= 400`); });
+  });
+
+  t('EXIT_BTN: 定数が存在する', () => {
+    if (typeof EXIT_BTN === 'undefined') throw new Error('EXIT_BTN not defined');
+    if (typeof EXIT_BTN.x !== 'number') throw new Error('EXIT_BTN.x missing');
+    if (EXIT_BTN.w <= 0) throw new Error('EXIT_BTN.w must be positive');
+  });
+
+  t('drawExitButton: 関数が存在する', () => {
+    if (typeof drawExitButton !== 'function') throw new Error('drawExitButton function not found');
+  });
+
+  t('exitToMenu: 実行するとphaseがmodeselectになる', () => {
+    phase = 'fight'; exitToMenu();
+    if (phase !== 'modeselect') throw new Error(`phase=${phase}, expected modeselect`);
   });
 
   // ---- 実行 ----
