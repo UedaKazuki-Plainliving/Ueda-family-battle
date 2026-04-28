@@ -180,12 +180,20 @@ canvas.addEventListener('pointerdown', e => {
     }
   }
   if (phase === 'intro') { keys['Enter'] = true; return; }
-  if (phase === 'modeselect' || phase === 'charselect') {
+  if (phase === 'modeselect' || phase === 'charselect' || phase === 'netwait') {
     const rect2 = canvas.getBoundingClientRect();
     const bex = (e.clientX - rect2.left) * (W / rect2.width);
     const bey = (e.clientY - rect2.top)  * (H / rect2.height);
     if (bex >= 12 && bex <= 100 && bey >= H-42 && bey <= H-14) {
+      if (phase === 'netwait') {
+        if(netWs){try{netWs.close();}catch(ex){} netWs=null;}
+        phase='modeselect'; beep(300,'sine',0.08); return;
+      }
       if (phase === 'charselect') {
+        if (gameMode==='net') {
+          if(netWs){try{netWs.close();}catch(ex){} netWs=null;}
+          phase='modeselect'; beep(300,'sine',0.08); return;
+        }
         if (selectStep === 1) { selectStep = 0; beep(300,'sine',0.08); return; }
         modeSelectStep=0; phase='modeselect'; beep(300,'sine',0.08); return;
       }
@@ -198,14 +206,14 @@ canvas.addEventListener('pointerdown', e => {
     const scaleY = H / rect.height;
     const ty = (e.clientY - rect.top) * scaleY;
     if (modeSelectStep === 1) {
-      // 難易度サブメニュー
       if (ty >= 200 && ty < 260) { cpuDifficulty='weak'; beep(350,'sine',0.08); }
       else if (ty >= 280 && ty < 340) { cpuDifficulty='normal'; beep(350,'sine',0.08); }
       else if (ty >= 360 && ty < 420) { cpuDifficulty='strong'; beep(350,'sine',0.08); }
       keys['Enter'] = true; return;
     }
-    if (ty >= 180 && ty < 290) { gameMode='cpu'; beep(350,'sine',0.08); modeSelectStep=1; return; }
-    else if (ty >= 290 && ty < 400) { gameMode='2p'; beep(350,'sine',0.08); keys['Enter'] = true; }
+    if (ty >= 130 && ty < 205) { gameMode='cpu'; beep(350,'sine',0.08); modeSelectStep=1; return; }
+    else if (ty >= 230 && ty < 305) { gameMode='2p'; beep(350,'sine',0.08); keys['Enter'] = true; }
+    else if (ty >= 330 && ty < 405) { gameMode='net'; beep(350,'sine',0.08); connectNet(); }
     return;
   }
   if (phase === 'charselect') {
@@ -216,7 +224,8 @@ canvas.addEventListener('pointerdown', e => {
     for (let idx=0; idx<CHAR_LIST.length; idx++) {
       const px = startX + idx*(PW+GAP);
       if (tx >= px && tx <= px+PW) {
-        if (selectStep===0) selectedCharIdx=idx;
+        if (gameMode==='net') selectedCharIdx=idx;
+        else if (selectStep===0) selectedCharIdx=idx;
         else cpuCharIdx=idx;
         beep(350,'sine',0.08);
         break;
@@ -1502,25 +1511,29 @@ function drawModeSelect() {
     return;
   }
 
-  const modes=[{id:'cpu',label:'1人プレイ（vs CPU）',sub:'AIと対戦'},{id:'2p',label:'2人プレイ（vs Player）',sub:'キーボードで2P対戦'}];
+  const modes=[
+    {id:'cpu', label:'1人プレイ（vs CPU）',     sub:'AIと対戦'},
+    {id:'2p',  label:'2人プレイ（vs Player）',   sub:'同じ端末で2P対戦'},
+    {id:'net', label:'ネット対戦（WiFi）',        sub:'同じWiFiの別端末と対戦'},
+  ];
   modes.forEach((m,i)=>{
-    const bx=W/2-180, by=180+i*110, bw=360, bh=80;
+    const bx=W/2-180, by=130+i*100, bw=360, bh=75;
     const sel=gameMode===m.id;
     ctx.strokeStyle=sel?'#ffdd00':'#555'; ctx.lineWidth=sel?3:1.5;
     ctx.fillStyle=sel?'rgba(255,200,0,0.1)':'rgba(255,255,255,0.03)';
     ctx.fillRect(bx,by,bw,bh); ctx.strokeRect(bx,by,bw,bh);
-    ctx.font='bold 22px sans-serif'; ctx.fillStyle=sel?'#ffdd00':'#aaa';
-    ctx.fillText(m.label,W/2,by+38);
+    ctx.font='bold 20px sans-serif'; ctx.fillStyle=sel?'#ffdd00':'#aaa';
+    ctx.fillText(m.label,W/2,by+34);
     ctx.font='13px sans-serif'; ctx.fillStyle='#777';
-    ctx.fillText(m.sub,W/2,by+62);
-    if (sel) { ctx.fillStyle='#ffdd00'; ctx.font='bold 16px sans-serif'; ctx.fillText('▶',bx+18,by+48); }
+    ctx.fillText(m.sub,W/2,by+56);
+    if (sel) { ctx.fillStyle='#ffdd00'; ctx.font='bold 16px sans-serif'; ctx.fillText('▶',bx+18,by+44); }
   });
   if (!IS_TOUCH) {
     ctx.font='13px sans-serif'; ctx.fillStyle='#666'; ctx.textAlign='center';
-    ctx.fillText('↑↓ / W/S で選択  　Space / Enter で決定',W/2,400);
+    ctx.fillText('↑↓ / W/S で選択  　Space / Enter で決定',W/2,430);
     if (gameMode==='2p') {
-      ctx.fillStyle='#888';
-      ctx.fillText('P2操作: ←→↑↓ 移動  Num1 パンチ  Num2 キック  Num3 ガード  Num0 必殺技',W/2,422);
+      ctx.fillStyle='#555';
+      ctx.fillText('P2操作: ←→↑↓  Num1 パンチ  Num2 キック  Num3 ガード  Num0 必殺技',W/2,446);
     }
   }
   drawBackBtn();
@@ -1530,7 +1543,10 @@ function drawCharSelect() {
   ctx.fillStyle='#000'; ctx.fillRect(0,0,W,H);
   ctx.font='bold 28px sans-serif'; ctx.textAlign='center';
   ctx.fillStyle='#ffdd00';
-  ctx.fillText(selectStep===0?'P1: キャラを選択':gameMode==='2p'?'P2: キャラを選択':'対戦相手を選択',W/2,38);
+  const charTitle = gameMode==='net'
+    ? `あなた（P${netPlayerNum||'?'}）のキャラを選択`
+    : selectStep===0?'P1: キャラを選択':gameMode==='2p'?'P2: キャラを選択':'対戦相手を選択';
+  ctx.fillText(charTitle,W/2,38);
   ctx.font='13px sans-serif'; ctx.fillStyle='#888';
   ctx.fillText(IS_TOUCH ? 'タップして選択 / 決定で確定' : '← → で選択　　Space / Enter で決定',W/2,62);
   drawBackBtn();
@@ -1540,12 +1556,13 @@ function drawCharSelect() {
     const px=startX+idx*(PW+GAP);
     const isP1=idx===selectedCharIdx;
     const isCPU=idx===cpuCharIdx;
-    const cursor=selectStep===0?isP1:isCPU;
-    const locked=selectStep===1&&isP1;
+    const isNetOpp=gameMode==='net'&&idx===netOppCharIdx;
+    const cursor=gameMode==='net'?isP1:(selectStep===0?isP1:isCPU);
+    const locked=gameMode==='net'?(netMyReady&&isP1):(selectStep===1&&isP1);
     const blink=Math.floor(Date.now()/300)%2;
-    ctx.strokeStyle=cursor?(blink?'#ffdd00':'#ff8800'):locked?'#00ccee':'#444';
-    ctx.lineWidth=cursor?3:locked?2:1.5;
-    ctx.fillStyle=cursor?'rgba(255,200,0,0.07)':locked?'rgba(0,180,255,0.05)':'rgba(255,255,255,0.02)';
+    ctx.strokeStyle=cursor?(blink?'#ffdd00':'#ff8800'):locked?'#00ccee':isNetOpp?'#f66':'#444';
+    ctx.lineWidth=cursor?3:locked?2:isNetOpp?2:1.5;
+    ctx.fillStyle=cursor?'rgba(255,200,0,0.07)':locked?'rgba(0,180,255,0.05)':isNetOpp?'rgba(255,80,80,0.05)':'rgba(255,255,255,0.02)';
     ctx.fillRect(px,78,PW,PH); ctx.strokeRect(px,78,PW,PH);
 
     ctx.save(); ctx.translate(px+PW/2,240);
@@ -1564,7 +1581,12 @@ function drawCharSelect() {
     ctx.font='10px sans-serif'; ctx.fillStyle='#888';
     def.flavor.forEach((line,li)=>ctx.fillText(line,px+PW/2,334+li*13));
     ctx.font='bold 12px sans-serif'; ctx.textAlign='center';
-    if (selectStep===0) {
+    if (gameMode==='net') {
+      if (locked){ctx.fillStyle='#00ccee';ctx.fillText(`✓ P${netPlayerNum}`,px+PW/2,93);}
+      else if (isP1){ctx.fillStyle='#ffdd00';ctx.fillText(`▶ P${netPlayerNum}`,px+PW/2,93);}
+      else if (isNetOpp){const o=netPlayerNum===1?2:1;ctx.fillStyle='#f88';ctx.fillText(`▶ P${o}`,px+PW/2,93);}
+      else {ctx.fillStyle='#555';ctx.fillText('',px+PW/2,93);}
+    } else if (selectStep===0) {
       ctx.fillStyle=isP1?'#ffdd00':'#555';
       ctx.fillText(isP1?'▶ P1':'',px+PW/2,93);
     } else {
@@ -1574,6 +1596,12 @@ function drawCharSelect() {
     }
   });
 
+  if (gameMode==='net'&&netMyReady&&netOppCharIdx===-1) {
+    ctx.fillStyle='rgba(0,0,0,0.72)'; ctx.fillRect(0,0,W,H);
+    const dots='.'.repeat(Math.floor(Date.now()/500)%4);
+    ctx.font='22px sans-serif'; ctx.textAlign='center'; ctx.fillStyle='#aaa';
+    ctx.fillText('相手を待っています'+dots,W/2,H/2);
+  }
 }
 
 // ---- Game State ----
@@ -1584,14 +1612,90 @@ let timerSec=99, timerTick=0;
 let wins=[0,0], roundNum=1;
 let flash={msg:'',t:0};
 let endTimer=0, selectedCharIdx=0, cpuCharIdx=1, selectStep=0;
-let gameMode='cpu'; // 'cpu' or '2p'
+let gameMode='cpu'; // 'cpu', '2p', or 'net'
 let modeSelectStep=0; // 0=モード選択, 1=難易度選択(CPUのみ)
 let cpuDifficulty='normal'; // 'weak', 'normal', 'strong'
+let netWs=null, netPlayerNum=0;
+let netOppInput={punch:false,kick:false,left:false,right:false,up:false,down:false,block:false,special:false};
+let netMyCharIdx=-1, netOppCharIdx=-1, netMyReady=false;
 function showFlash(msg,dur){flash.msg=msg;flash.t=dur;}
 function exitToMenu(){
+  if(netWs){try{netWs.close();}catch(e){} netWs=null;}
+  netPlayerNum=0; netMyCharIdx=-1; netOppCharIdx=-1; netMyReady=false;
   wins=[0,0]; roundNum=1; selectStep=0; modeSelectStep=0;
   phase='modeselect';
   try{beep(300,'sine',0.08);}catch(e){}
+}
+
+function connectNet() {
+  const proto=location.protocol==='https:'?'wss':'ws';
+  const url=proto+'://'+location.host;
+  try { netWs=new WebSocket(url); } catch(e) { phase='netwait'; return; }
+  phase='netwait';
+  netWs.onmessage=e=>{ try{handleNetMsg(JSON.parse(e.data));}catch(ex){} };
+  netWs.onclose=()=>{
+    if(phase==='fight'||phase==='countdown'||phase==='roundend') {
+      showFlash('相手が切断しました',200);
+      setTimeout(()=>exitToMenu(),3000);
+    } else if(phase==='netwait'||phase==='charselect') {
+      phase='netwait';
+    }
+    netWs=null;
+  };
+  netWs.onerror=()=>{};
+}
+
+function handleNetMsg(msg) {
+  switch(msg.type) {
+    case 'start':
+      netPlayerNum=msg.player;
+      netMyCharIdx=-1; netOppCharIdx=-1; netMyReady=false;
+      phase='charselect'; selectStep=0; selectedCharIdx=0; cpuCharIdx=1;
+      beep(440,'sine',0.12);
+      break;
+    case 'char':
+      netOppCharIdx=msg.idx;
+      if(netMyReady) startNetFight();
+      break;
+    case 'input':
+      netOppInput={punch:!!msg.punch,kick:!!msg.kick,left:!!msg.left,right:!!msg.right,
+                   up:!!msg.up,down:!!msg.down,block:!!msg.block,special:!!msg.special};
+      break;
+    case 'disconnect':
+      showFlash('相手が切断しました',200);
+      setTimeout(()=>exitToMenu(),3000);
+      break;
+  }
+}
+
+function startNetFight() {
+  if(netPlayerNum===1){selectedCharIdx=netMyCharIdx;cpuCharIdx=netOppCharIdx;}
+  else{selectedCharIdx=netOppCharIdx;cpuCharIdx=netMyCharIdx;}
+  wins=[0,0];roundNum=1;startRound();phase='countdown';
+  showFlash(`ROUND ${roundNum}`,80);
+  setTimeout(()=>showFlash('FIGHT!',70),1200);
+  setTimeout(()=>{phase='fight';},1800);
+  beep(523,'sine',0.3,0.4);
+}
+
+function drawNetWait() {
+  ctx.fillStyle='#000'; ctx.fillRect(0,0,W,H);
+  ctx.font='bold 32px sans-serif'; ctx.textAlign='center';
+  ctx.fillStyle='#ffdd00'; ctx.fillText('ネット対戦（WiFi）',W/2,100);
+  if(!netWs||netWs.readyState>1) {
+    ctx.font='18px sans-serif'; ctx.fillStyle='#f66';
+    ctx.fillText('サーバーに接続できません',W/2,210);
+    ctx.font='14px sans-serif'; ctx.fillStyle='#666';
+    ctx.fillText('node server.js を起動してから接続してください',W/2,240);
+    drawBackBtn(); return;
+  }
+  const dots='.'.repeat(Math.floor(Date.now()/500)%4);
+  ctx.font='22px sans-serif'; ctx.fillStyle='#aaa';
+  ctx.fillText('相手プレイヤーを待っています'+dots,W/2,210);
+  ctx.font='14px sans-serif'; ctx.fillStyle='#666';
+  ctx.fillText('相手も同じURLにアクセスしてください',W/2,245);
+  ctx.fillText('（接続: '+location.host+'）',W/2,268);
+  drawBackBtn();
 }
 
 function startRound() {
@@ -1646,33 +1750,56 @@ function loop() {
         modeSelectStep=0; phase='charselect'; selectStep=0; selectedCharIdx=0; cpuCharIdx=1; beep(440,'sine',0.12);
       }
     } else {
-      if (keyOnce('ArrowUp')||keyOnce('KeyW')) { gameMode='cpu'; beep(350,'sine',0.08); }
-      if (keyOnce('ArrowDown')||keyOnce('KeyS')) { gameMode='2p'; beep(350,'sine',0.08); }
+      const modeList=['cpu','2p','net'];
+      const mi=modeList.indexOf(gameMode);
+      if (keyOnce('ArrowUp')||keyOnce('KeyW')) { gameMode=modeList[Math.max(0,mi-1)]; beep(350,'sine',0.08); }
+      if (keyOnce('ArrowDown')||keyOnce('KeyS')) { gameMode=modeList[Math.min(2,mi+1)]; beep(350,'sine',0.08); }
       if (keyOnce('Space')||keyOnce('Enter')) {
         if (gameMode==='cpu') { modeSelectStep=1; beep(350,'sine',0.08); }
-        else { phase='charselect'; selectStep=0; selectedCharIdx=0; cpuCharIdx=1; beep(440,'sine',0.12); }
+        else if (gameMode==='2p') { phase='charselect'; selectStep=0; selectedCharIdx=0; cpuCharIdx=1; beep(440,'sine',0.12); }
+        else { connectNet(); beep(350,'sine',0.08); }
       }
+    }
+    return;
+  }
+  if (phase==='netwait') {
+    drawNetWait();
+    if (keyOnce('Backspace')||keyOnce('Escape')) {
+      if(netWs){try{netWs.close();}catch(e){} netWs=null;}
+      phase='modeselect'; beep(300,'sine',0.08);
     }
     return;
   }
   if (phase==='charselect') {
     drawCharSelect();
     if (keyOnce('Backspace')||keyOnce('Escape')) {
-      if (selectStep===1) { selectStep=0; beep(300,'sine',0.08); }
+      if (gameMode==='net') {
+        if(netWs){try{netWs.close();}catch(e){} netWs=null;}
+        phase='modeselect'; beep(300,'sine',0.08);
+      } else if (selectStep===1) { selectStep=0; beep(300,'sine',0.08); }
       else { modeSelectStep=0; phase='modeselect'; beep(300,'sine',0.08); }
       return;
     }
     if (keyOnce('ArrowLeft')||keyOnce('KeyA')) {
-      if (selectStep===0) selectedCharIdx=(selectedCharIdx-1+CHAR_LIST.length)%CHAR_LIST.length;
+      if (gameMode==='net'||selectStep===0) selectedCharIdx=(selectedCharIdx-1+CHAR_LIST.length)%CHAR_LIST.length;
       else cpuCharIdx=(cpuCharIdx-1+CHAR_LIST.length)%CHAR_LIST.length;
       beep(350,'sine',0.08);
     }
     if (keyOnce('ArrowRight')||keyOnce('KeyD')) {
-      if (selectStep===0) selectedCharIdx=(selectedCharIdx+1)%CHAR_LIST.length;
+      if (gameMode==='net'||selectStep===0) selectedCharIdx=(selectedCharIdx+1)%CHAR_LIST.length;
       else cpuCharIdx=(cpuCharIdx+1)%CHAR_LIST.length;
       beep(350,'sine',0.08);
     }
     if (keyOnce('Space')||keyOnce('Enter')||keyOnce('KeyJ')) {
+      if (gameMode==='net') {
+        if (!netMyReady) {
+          netMyCharIdx=selectedCharIdx; netMyReady=true;
+          if (netWs&&netWs.readyState===1) netWs.send(JSON.stringify({type:'char',idx:selectedCharIdx}));
+          beep(440,'sine',0.12);
+          if (netOppCharIdx!==-1) startNetFight();
+        }
+        return;
+      }
       if (selectStep===0) {
         selectStep=1; cpuCharIdx=(selectedCharIdx+1)%CHAR_LIST.length;
         beep(440,'sine',0.12);
@@ -1692,11 +1819,14 @@ function loop() {
 
   if (phase==='fight') {
     if (++timerTick>=60){timerTick=0;timerSec--;}
-    const i1={punch:keys['KeyJ'],kick:keys['KeyK'],left:keys['KeyA'],right:keys['KeyD'],
-               up:keys['KeyW'],down:keys['KeyS'],block:keys['KeyL'],special:keys['Space']};
+    const myInput={punch:keys['KeyJ'],kick:keys['KeyK'],left:keys['KeyA'],right:keys['KeyD'],
+                   up:keys['KeyW'],down:keys['KeyS'],block:keys['KeyL'],special:keys['Space']};
+    if (gameMode==='net'&&netWs&&netWs.readyState===1) netWs.send(JSON.stringify({type:'input',...myInput}));
+    const i1=gameMode==='net'&&netPlayerNum===2?netOppInput:myInput;
     const i2=gameMode==='2p'
       ?{punch:keys['Numpad1'],kick:keys['Numpad2'],block:keys['Numpad3'],special:keys['Numpad0'],
         left:keys['ArrowLeft'],right:keys['ArrowRight'],up:keys['ArrowUp'],down:keys['ArrowDown']}
+      :gameMode==='net'?(netPlayerNum===2?myInput:netOppInput)
       :cpuCtrl.update();
     p1.update(p2,i1); p2.update(p1,i2);
 
@@ -1736,16 +1866,22 @@ function loop() {
       else if (p2ko&&!p1ko) p1wins=true;
       else if (p1ko&&!p2ko) p1wins=false;
       else p1wins=null;
-      if (p1wins===true){wins[0]++;showFlash(`${p1.def.name} WIN!`,130);beep(523,'sine',0.6,0.4);}
-      else if (p1wins===false){wins[1]++;showFlash('CPU WIN!',130);beep(330,'sine',0.6,0.35);}
-      else{showFlash('DRAW!',130);}
+      if (p1wins===true){
+        wins[0]++;
+        const wn=gameMode==='net'&&netPlayerNum===2?'相手':p1.def.name;
+        showFlash(`${wn} WIN!`,130);beep(523,'sine',0.6,0.4);
+      } else if (p1wins===false){
+        wins[1]++;
+        const wn=gameMode==='net'&&netPlayerNum===1?'相手':gameMode==='2p'?p2.def.name:'CPU';
+        showFlash(`${wn} WIN!`,130);beep(330,'sine',0.6,0.35);
+      } else{showFlash('DRAW!',130);}
       phase='roundend';endTimer=200;
     }
   }
 
   if (phase==='roundend'||phase==='countdown') {
     if (phase==='roundend'&&--endTimer<=0) {
-      if (wins[0]>=2||wins[1]>=2){wins=[0,0];roundNum=1;selectStep=0;modeSelectStep=0;phase='modeselect';return;}
+      if (wins[0]>=2||wins[1]>=2){exitToMenu();return;}
       roundNum++;startRound();phase='countdown';
       showFlash(`ROUND ${roundNum}`,80);
       setTimeout(()=>showFlash('FIGHT!',70),1200);
