@@ -19,17 +19,19 @@
     padding: 8px 10px; user-select: none;
   }
   .ctrl-row { display: flex; justify-content: space-between; align-items: center; }
-  .dpad { position: relative; width: 126px; height: 126px; }
+  .dpad { position: relative; width: 168px; height: 126px; }
   .dpad-btn {
     position: absolute; background: rgba(255,255,255,0.13); border: 2px solid rgba(255,255,255,0.25);
     border-radius: 8px; display: flex; align-items: center; justify-content: center;
-    font-size: 22px; color: #fff; touch-action: none;
+    font-size: 20px; color: #fff; touch-action: none;
   }
   .dpad-btn:active, .dpad-btn.active { background: rgba(255,255,255,0.35); }
-  #btn-left  { left: 0;   top: 42px; width: 42px; height: 42px; }
-  #btn-right { left: 84px; top: 42px; width: 42px; height: 42px; }
-  #btn-up    { left: 42px; top: 0;    width: 42px; height: 42px; }
-  #btn-down  { left: 42px; top: 84px; width: 42px; height: 42px; }
+  #btn-left    { left: 0;    top: 42px;  width: 42px; height: 42px; }
+  #btn-right   { left: 84px; top: 42px;  width: 42px; height: 42px; }
+  #btn-up      { left: 42px; top: 0;     width: 42px; height: 42px; }
+  #btn-down    { left: 42px; top: 84px;  width: 42px; height: 42px; }
+  #btn-upleft  { left: 0;    top: 0;     width: 38px; height: 38px; font-size: 15px; }
+  #btn-upright { left: 88px; top: 0;     width: 38px; height: 38px; font-size: 15px; }
   .action-btns { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
   .abtn {
     width: 58px; height: 58px; border-radius: 50%;
@@ -62,7 +64,9 @@
   <div id="fight-ctrls">
     <div class="ctrl-row">
       <div class="dpad">
+        <div class="dpad-btn" id="btn-upleft">↖</div>
         <div class="dpad-btn" id="btn-up">▲</div>
+        <div class="dpad-btn" id="btn-upright">↗</div>
         <div class="dpad-btn" id="btn-left">◀</div>
         <div class="dpad-btn" id="btn-right">▶</div>
         <div class="dpad-btn" id="btn-down">▼</div>
@@ -127,6 +131,20 @@ bindHold(document.getElementById('btn-left'),    'KeyA');
 bindHold(document.getElementById('btn-right'),   'KeyD');
 bindHold(document.getElementById('btn-up'),      'KeyW');
 bindHold(document.getElementById('btn-down'),    'KeyS');
+// 斜めボタン: 2キー同時
+function bindHold2(el, code1, code2) {
+  const on  = e => { e.preventDefault(); keys[code1]=true;  keys[code2]=true;  el.classList.add('active'); };
+  const off = e => { e.preventDefault(); keys[code1]=false; keys[code2]=false; el.classList.remove('active'); };
+  el.addEventListener('pointerdown',   on,  {passive: false});
+  el.addEventListener('pointerup',     off, {passive: false});
+  el.addEventListener('pointercancel', off, {passive: false});
+  el.addEventListener('pointerleave',  off, {passive: false});
+  el.addEventListener('touchstart',    on,  {passive: false});
+  el.addEventListener('touchend',      off, {passive: false});
+  el.addEventListener('touchcancel',   off, {passive: false});
+}
+bindHold2(document.getElementById('btn-upleft'),  'KeyW', 'KeyA');
+bindHold2(document.getElementById('btn-upright'), 'KeyW', 'KeyD');
 bindHold(document.getElementById('btn-punch'),   'KeyJ');
 bindHold(document.getElementById('btn-kick'),    'KeyK');
 bindHold(document.getElementById('btn-block'),   'KeyL');
@@ -145,6 +163,14 @@ document.addEventListener('touchcancel', e => e.preventDefault(), {passive: fals
 canvas.addEventListener('pointerdown', e => {
   if (audio.state === 'suspended') audio.resume();
   if (phase === 'intro') { keys['Enter'] = true; return; }
+  if (phase === 'modeselect') {
+    const rect = canvas.getBoundingClientRect();
+    const scaleY = H / rect.height;
+    const ty = (e.clientY - rect.top) * scaleY;
+    if (ty >= 180 && ty < 290) { gameMode='cpu'; beep(350,'sine',0.08); }
+    else if (ty >= 290 && ty < 400) { gameMode='2p'; beep(350,'sine',0.08); }
+    keys['Enter'] = true; return;
+  }
   if (phase === 'charselect') {
     const rect = canvas.getBoundingClientRect();
     const scaleX = W / rect.width;
@@ -593,6 +619,7 @@ class Fighter {
     this.specialGauge=0; this.maxSpecialGauge=100;
     this.specialVx=0; this.specialFired=false;
     this.punchFired=false; this.guardFlash=0; this.guardMode=false;
+    this.comboCount=0;
   }
   hurtbox() {
     const s=this.def.scale;
@@ -623,6 +650,7 @@ class Fighter {
     return null;
   }
   takeHit(info,fromDir) {
+    if (this.state==='special') return false;
     if (this.hitStun>0||this.state==='dead') return false;
     const type=info.type||'normal';
     const facing=this.dir!==fromDir;
@@ -630,19 +658,23 @@ class Fighter {
     const crouchG=this.guardMode&&this.state==='crouch'&&facing;
     this.specialGauge=Math.min(this.maxSpecialGauge,this.specialGauge+8);
     if ((standG&&(type==='punch'||type==='jatk'))||(crouchG&&(type==='kick'||type==='jkick'))) {
-      this.blockStun=18; this.guardFlash=14;
+      this.comboCount=0; this.blockStun=18; this.guardFlash=14;
       beep(95,'sine',0.28,0.18); beep(60,'sine',0.14,0.14);
       return true;
     }
     if ((standG||crouchG)&&type==='special') {
+      this.comboCount=0;
       this.hp-=Math.max(1,Math.floor(info.dmg*0.4));
       this.blockStun=10; this.guardFlash=9;
       beep(75,'sine',0.22,0.2);
       if (this.hp<=0){this.hp=0;this.state='dead';} return true;
     }
+    this.comboCount++;
+    let push=info.push;
+    if (this.comboCount>=5) { push=info.push*3; this.comboCount=0; }
     this.hp-=info.dmg; this.hitStun=info.stun;
-    this.state='hurt'; this.st=0; this.x+=fromDir*info.push;
-    if (this.hp<=0){this.hp=0;this.state='dead';}
+    this.state='hurt'; this.st=0; this.x+=fromDir*push;
+    if (this.hp<=0){this.hp=0;this.state='dead';this.comboCount=0;}
     return true;
   }
   update(opp,inp) {
@@ -664,7 +696,7 @@ class Fighter {
       } else {
         const fireFrame={'icchi':9,'soyo':8,'otousan':15,'okaasan':10}[id]??9;
         const endFrame={'icchi':26,'soyo':28,'otousan':35,'okaasan':30}[id]??26;
-        if (this.st===fireFrame&&!this.specialFired) this.specialFired=true;
+        if (this.st===fireFrame&&!this.specialFired){this.specialFired=true;this.specialGauge=0;}
         if (this.st>=endFrame){this.state='idle';this.st=0;}
       }
       if (this.hitStun===0) this.dir=opp.x>this.x?1:-1;
@@ -692,8 +724,8 @@ class Fighter {
     const ok=this.blockStun===0;
 
     if (ok&&inp.special&&this.specialGauge>=this.maxSpecialGauge&&this.onGround) {
-      this.state='special';this.st=0;this.specialGauge=0;this.specialFired=false;this.punchFired=false;
-      if (this.def.id==='yuuri'){this.specialVx=this.dir*14;this.vy=-8;this.onGround=false;}
+      this.state='special';this.st=0;this.specialFired=false;this.punchFired=false;
+      if (this.def.id==='yuuri'){this.specialVx=this.dir*14;this.vy=-8;this.onGround=false;this.specialGauge=0;}
       triggerSpecialFlash(this.def);
       return;
     }
@@ -710,9 +742,9 @@ class Fighter {
       if (inp.right) this.x+=this.def.walkSpd*1.4;
     }
     else if (inp.down&&this.onGround){this.state='crouch';}
-    else if (inp.left&&this.onGround){this.x-=this.def.walkSpd;this.state='walk';}
-    else if (inp.right&&this.onGround){this.x+=this.def.walkSpd;this.state='walk';}
-    else if (this.onGround&&this.state!=='block'){this.state='idle';}
+    else if (inp.left&&this.onGround){this.x-=this.def.walkSpd;this.state='walk';this.comboCount=0;}
+    else if (inp.right&&this.onGround){this.x+=this.def.walkSpd;this.state='walk';this.comboCount=0;}
+    else if (this.onGround&&this.state!=='block'){this.state='idle';this.comboCount=0;}
 
     // Air horizontal movement (diagonal jump)
     if (!this.onGround&&(this.state==='jump'||this.state==='jatk'||this.state==='jkick'||this.state==='hurt')) {
@@ -1067,7 +1099,7 @@ function drawHUD() {
   ctx.fillStyle=hpColor(p2.hp); ctx.fillRect(W-320+(300-w2),18,w2,22);
   ctx.strokeStyle='#aaa'; ctx.lineWidth=2; ctx.strokeRect(W-320,18,300,22);
   ctx.fillStyle='#fff'; ctx.font='bold 12px sans-serif'; ctx.textAlign='right';
-  ctx.fillText(p2.def.name+'(CPU)',W-25,34);
+  ctx.fillText(p2.def.name+(gameMode==='2p'?'(P2)':'(CPU)'),W-25,34);
 
   const sg2=p2.specialGauge/p2.maxSpecialGauge;
   ctx.fillStyle='#111'; ctx.fillRect(W-320,43,300,11);
@@ -1133,11 +1165,38 @@ function drawIntro() {
   }
 }
 
+function drawModeSelect() {
+  ctx.fillStyle='#000'; ctx.fillRect(0,0,W,H);
+  ctx.font='bold 36px sans-serif'; ctx.textAlign='center';
+  ctx.fillStyle='#ffdd00'; ctx.fillText('モード選択',W/2,120);
+  const modes=[{id:'cpu',label:'1人プレイ（vs CPU）',sub:'AIと対戦'},{id:'2p',label:'2人プレイ（vs Player）',sub:'キーボードで2P対戦'}];
+  modes.forEach((m,i)=>{
+    const bx=W/2-180, by=180+i*110, bw=360, bh=80;
+    const sel=gameMode===m.id;
+    ctx.strokeStyle=sel?'#ffdd00':'#555'; ctx.lineWidth=sel?3:1.5;
+    ctx.fillStyle=sel?'rgba(255,200,0,0.1)':'rgba(255,255,255,0.03)';
+    ctx.fillRect(bx,by,bw,bh); ctx.strokeRect(bx,by,bw,bh);
+    ctx.font='bold 22px sans-serif'; ctx.fillStyle=sel?'#ffdd00':'#aaa';
+    ctx.fillText(m.label,W/2,by+38);
+    ctx.font='13px sans-serif'; ctx.fillStyle='#777';
+    ctx.fillText(m.sub,W/2,by+62);
+    if (sel) { ctx.fillStyle='#ffdd00'; ctx.font='bold 16px sans-serif'; ctx.fillText('▶',bx+18,by+48); }
+  });
+  if (!IS_TOUCH) {
+    ctx.font='13px sans-serif'; ctx.fillStyle='#666'; ctx.textAlign='center';
+    ctx.fillText('↑↓ / W/S で選択  　Space / Enter で決定',W/2,400);
+    if (gameMode==='2p') {
+      ctx.fillStyle='#888';
+      ctx.fillText('P2操作: ←→↑↓ 移動  Num1 パンチ  Num2 キック  Num3 ガード  Num0 必殺技',W/2,422);
+    }
+  }
+}
+
 function drawCharSelect() {
   ctx.fillStyle='#000'; ctx.fillRect(0,0,W,H);
   ctx.font='bold 28px sans-serif'; ctx.textAlign='center';
   ctx.fillStyle='#ffdd00';
-  ctx.fillText(selectStep===0?'あなたのキャラを選択':'対戦相手を選択',W/2,38);
+  ctx.fillText(selectStep===0?'P1: キャラを選択':gameMode==='2p'?'P2: キャラを選択':'対戦相手を選択',W/2,38);
   ctx.font='13px sans-serif'; ctx.fillStyle='#888';
   ctx.fillText(IS_TOUCH ? 'タップして選択 / 決定で確定' : '← → で選択　　Space / Enter で決定',W/2,62);
 
@@ -1172,10 +1231,10 @@ function drawCharSelect() {
     ctx.font='bold 12px sans-serif'; ctx.textAlign='center';
     if (selectStep===0) {
       ctx.fillStyle=isP1?'#ffdd00':'#555';
-      ctx.fillText(isP1?'▶ あなた':'',px+PW/2,93);
+      ctx.fillText(isP1?'▶ P1':'',px+PW/2,93);
     } else {
-      if (locked){ctx.fillStyle='#00ccee';ctx.fillText('✓ あなた',px+PW/2,93);}
-      else if (isCPU){ctx.fillStyle='#ffdd00';ctx.fillText('▶ CPU',px+PW/2,93);}
+      if (locked){ctx.fillStyle='#00ccee';ctx.fillText('✓ P1',px+PW/2,93);}
+      else if (isCPU){ctx.fillStyle='#ffdd00';ctx.fillText(gameMode==='2p'?'▶ P2':'▶ CPU',px+PW/2,93);}
       else {ctx.fillStyle='#555';ctx.fillText('',px+PW/2,93);}
     }
   });
@@ -1189,13 +1248,15 @@ let timerSec=99, timerTick=0;
 let wins=[0,0], roundNum=1;
 let flash={msg:'',t:0};
 let endTimer=0, selectedCharIdx=0, cpuCharIdx=1, selectStep=0;
+let gameMode='cpu'; // 'cpu' or '2p'
+let modeSelectStep=0; // 0=モード選択, 1以降=キャラ選択
 function showFlash(msg,dur){flash.msg=msg;flash.t=dur;}
 
 function startRound() {
   const p1def=CHAR_LIST[selectedCharIdx];
   p1=new Fighter(200,true,p1def);
   p2=new Fighter(600,false,CHAR_LIST[cpuCharIdx]);
-  cpuCtrl=new CPU(p2,p1);
+  cpuCtrl=gameMode==='cpu'?new CPU(p2,p1):null;
   projectiles.length=0; wordProjs.length=0;
   hurdleAttack=null; activeGorilla=null;
   timerSec=99; timerTick=0;
@@ -1219,7 +1280,16 @@ function loop() {
 
   if (phase==='intro') {
     drawIntro();
-    if (keyOnce('Space')||keyOnce('Enter')){phase='charselect';beep(440,'sine',0.1);}
+    if (keyOnce('Space')||keyOnce('Enter')){phase='modeselect';beep(440,'sine',0.1);}
+    return;
+  }
+  if (phase==='modeselect') {
+    drawModeSelect();
+    if (keyOnce('ArrowUp')||keyOnce('KeyW')) { gameMode='cpu'; beep(350,'sine',0.08); }
+    if (keyOnce('ArrowDown')||keyOnce('KeyS')) { gameMode='2p'; beep(350,'sine',0.08); }
+    if (keyOnce('Space')||keyOnce('Enter')) {
+      phase='charselect'; selectStep=0; selectedCharIdx=0; cpuCharIdx=1; beep(440,'sine',0.12);
+    }
     return;
   }
   if (phase==='charselect') {
@@ -1256,7 +1326,10 @@ function loop() {
     if (++timerTick>=60){timerTick=0;timerSec--;}
     const i1={punch:keys['KeyJ'],kick:keys['KeyK'],left:keys['KeyA'],right:keys['KeyD'],
                up:keys['KeyW'],down:keys['KeyS'],block:keys['KeyL'],special:keys['Space']};
-    const i2=cpuCtrl.update();
+    const i2=gameMode==='2p'
+      ?{punch:keys['Numpad1'],kick:keys['Numpad2'],block:keys['Numpad3'],special:keys['Numpad0'],
+        left:keys['ArrowLeft'],right:keys['ArrowRight'],up:keys['ArrowUp'],down:keys['ArrowDown']}
+      :cpuCtrl.update();
     p1.update(p2,i1); p2.update(p1,i2);
 
     if (p1.specialFired){p1.specialFired=false;spawnSpecialEffect(p1,p2);}
@@ -1304,7 +1377,7 @@ function loop() {
 
   if (phase==='roundend'||phase==='countdown') {
     if (phase==='roundend'&&--endTimer<=0) {
-      if (wins[0]>=2||wins[1]>=2){wins=[0,0];roundNum=1;selectStep=0;phase='charselect';return;}
+      if (wins[0]>=2||wins[1]>=2){wins=[0,0];roundNum=1;selectStep=0;phase='modeselect';return;}
       roundNum++;startRound();phase='countdown';
       showFlash(`ROUND ${roundNum}`,80);
       setTimeout(()=>showFlash('FIGHT!',70),1200);
@@ -1415,6 +1488,79 @@ if (location.search.includes('test')) {
   t('update: crouch+block → guardMode=true',       () => { const f=mkF('icchi',true,300); f.state='crouch'; const o=mkF('yuuri',false,500); f.update(o,mkI({block:true,down:true})); eq(f.guardMode,true); });
   t('update: crouch+block なし → guardMode=false', () => { const f=mkF('icchi',true,300); f.state='crouch'; const o=mkF('yuuri',false,500); f.update(o,mkI({down:true})); eq(f.guardMode,false); });
   t('update: idle → guardMode=false',              () => { const f=mkF('icchi',true,300); f.state='idle';  const o=mkF('yuuri',false,500); f.update(o,mkI()); eq(f.guardMode,false); });
+
+  // ---- 必殺技無敵フレーム ----
+  t('必殺技発動中はダメージを受けない', () => {
+    const f = mkF('icchi', true);
+    f.state = 'special';
+    const result = f.takeHit({dmg:20, stun:20, push:10, type:'punch'}, -1);
+    eq(result, false);
+    eq(f.hp, 100);
+  });
+
+  // ---- コンボブロー ----
+  t('5連続ヒットでcomboCountがリセットされ大ノックバック', () => {
+    const f = mkF('icchi', true, 300);
+    // 4発入れる
+    for (let i = 0; i < 4; i++) {
+      f.hitStun = 0;
+      f.takeHit({dmg:5, stun:1, push:10, type:'punch'}, -1);
+    }
+    const hpBefore = f.hp;
+    f.hitStun = 0;
+    const xBefore = f.x;
+    f.takeHit({dmg:5, stun:1, push:10, type:'punch'}, -1);
+    // コンボブロー発動 → 通常pushの3倍以上動く
+    if (Math.abs(f.x - xBefore) <= 10) throw new Error('combo knockback should be larger');
+    eq(f.comboCount, 0); // リセット
+  });
+
+  // ---- ガードシステム ----
+  t('立ちガード: パンチをブロック', () => {
+    const f = mkF('icchi', true, 300); f.state='block'; f.guardMode=true;
+    f.takeHit({dmg:10, stun:16, push:0, type:'punch'}, -1);
+    eq(f.hp, 100);
+  });
+  t('立ちガード: キックはブロックしない', () => {
+    const f = mkF('icchi', true, 300); f.state='block'; f.guardMode=true;
+    f.takeHit({dmg:10, stun:16, push:0, type:'kick'}, -1);
+    if (f.hp === 100) throw new Error('standing guard must not block kicks');
+  });
+  t('しゃがみガード: キックをブロック', () => {
+    const f = mkF('icchi', true, 300); f.state='crouch'; f.guardMode=true;
+    f.takeHit({dmg:10, stun:16, push:0, type:'kick'}, -1);
+    eq(f.hp, 100);
+  });
+  t('しゃがみガード: パンチはブロックしない', () => {
+    const f = mkF('icchi', true, 300); f.state='crouch'; f.guardMode=true;
+    f.takeHit({dmg:10, stun:16, push:0, type:'punch'}, -1);
+    if (f.hp === 100) throw new Error('crouch guard must not block punches');
+  });
+  t('しゃがみ(ガードなし): キックはヒットする', () => {
+    const f = mkF('icchi', true, 300); f.state='crouch'; f.guardMode=false;
+    f.takeHit({dmg:10, stun:16, push:0, type:'kick'}, -1);
+    if (f.hp === 100) throw new Error('unguarded crouch should receive kick damage');
+  });
+
+  // ---- hitbox方向確認 ----
+  t('jatk(ジャンプパンチ)のhitboxはy座標が上(低い値)', () => {
+    const f = mkF('icchi', true, 300);
+    f.state = 'jatk'; f.st = CHARS.icchi.jatkS;
+    const hb = f.hitbox();
+    if (!hb) throw new Error('jatk hitbox expected');
+    // hb.y は絶対座標 (GROUND=340基準)、jatkはGROUND-150*scale=235付近
+    const relY = hb.y - GROUND; // 相対値: 約 -105
+    if (relY > -80) throw new Error('jatk hitbox should be above head, got relY=' + relY);
+  });
+  t('jkick(ジャンプキック)のhitboxはy座標が下(高い値)', () => {
+    const f = mkF('icchi', true, 300);
+    f.state = 'jkick'; f.st = CHARS.icchi.kickS;
+    const hb = f.hitbox();
+    if (!hb) throw new Error('jkick hitbox expected');
+    // hb.y は絶対座標 (GROUND=340基準)、jkickはGROUND-65*scale=294付近
+    const relY = hb.y - GROUND; // 相対値: 約 -45
+    if (relY < -80) throw new Error('jkick hitbox should be near feet, got relY=' + relY);
+  });
 
   // ---- 実行 ----
   _T.forEach(({name,fn}) => {
