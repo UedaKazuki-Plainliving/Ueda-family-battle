@@ -348,6 +348,7 @@ function drawBackground() {
 const effects = [];
 let screenFlash = {t:0, color:'#fff'};
 let specialBanner = {name:'', color:'#fff', t:0};
+let superFlash = {t:0, color:'#fff', ox:400, oy:225};
 
 function spawnHit(x,y,big=false) {
   effects.push({x,y,t:big?25:18,big});
@@ -373,10 +374,45 @@ function triggerSpecialFlash(def) {
   screenFlash = {t:14, color: def.c1};
   specialBanner = {name: def.specialName, color: def.c1, t:90};
 }
-function triggerSuperFlash(def) {
-  screenFlash = {t:22, color: '#ffffff'};
-  specialBanner = {name: '超必殺！'+def.superName, color: def.c1, t:110};
+function triggerSuperFlash(def, ox, oy) {
+  screenFlash = {t:10, color: '#ffffff'};
+  specialBanner = {name: '超必殺！'+def.superName, color: def.c1, t:115};
+  superFlash = {t:55, color: def.c1, ox: ox??400, oy: (oy??225)-65};
   beep(800,'sawtooth',0.3,0.5); setTimeout(()=>beep(1200,'square',0.22,0.4),100);
+}
+function drawSuperFlash() {
+  if (superFlash.t<=0) return;
+  const cx=superFlash.ox, cy=superFlash.oy, col=superFlash.color, t=superFlash.t;
+  if (t>40) {
+    const a=(t-40)/15*0.92;
+    ctx.globalAlpha=a; ctx.fillStyle='#ffffff'; ctx.fillRect(0,0,W,H);
+    ctx.strokeStyle='#ffffff'; ctx.lineWidth=5; ctx.globalAlpha=a*0.6;
+    for (let i=0;i<16;i++) {
+      const ang=i/16*Math.PI*2, len=(1-(t-40)/15)*W*1.2;
+      ctx.beginPath(); ctx.moveTo(cx,cy); ctx.lineTo(cx+Math.cos(ang)*len,cy+Math.sin(ang)*len); ctx.stroke();
+    }
+  } else if (t>15) {
+    const prog=(t-15)/25;
+    ctx.globalAlpha=prog*0.42; ctx.fillStyle=col; ctx.fillRect(0,0,W,H);
+    ctx.strokeStyle='#ffffff'; ctx.lineWidth=3; ctx.globalAlpha=prog*0.75;
+    for (let r=0;r<3;r++) {
+      const radius=(1-prog)*W*0.9+r*90;
+      ctx.beginPath(); ctx.arc(cx,cy,radius,0,Math.PI*2); ctx.stroke();
+    }
+    ctx.strokeStyle=col; ctx.lineWidth=7; ctx.globalAlpha=prog*0.9;
+    ctx.beginPath(); ctx.arc(cx,cy,(1-prog)*W*0.55+25,0,Math.PI*2); ctx.stroke();
+    ctx.strokeStyle='#ffffff'; ctx.lineWidth=2;
+    for (let i=0;i<10;i++) {
+      const ang=i/10*Math.PI*2+(1-prog)*Math.PI*2;
+      const r1=50+prog*160, r2=r1+50+prog*70;
+      ctx.globalAlpha=prog*(0.3+0.7*(Math.sin(t*0.9+i*1.1)*0.5+0.5));
+      ctx.beginPath(); ctx.moveTo(cx+Math.cos(ang)*r1,cy+Math.sin(ang)*r1);
+      ctx.lineTo(cx+Math.cos(ang)*r2,cy+Math.sin(ang)*r2); ctx.stroke();
+    }
+  } else {
+    ctx.globalAlpha=t/15*0.28; ctx.fillStyle=col; ctx.fillRect(0,0,W,H);
+  }
+  ctx.globalAlpha=1; superFlash.t--;
 }
 
 function drawScreenFlash() {
@@ -1056,7 +1092,7 @@ class Fighter {
         this.state='super';this.st=0;this.superFired=false;this.atkHit=false;this.specialGauge=0;
         if (this.def.id==='yuuri'){this.vy=-26;this.onGround=false;this.superPhase=0;this.airVx=0;}
         else if (this.def.id==='soyo'){this.superPhase=0;this.superTargetX=opp.x;this.superOriginX=this.x;this.superHitActive=0;}
-        triggerSuperFlash(this.def);
+        triggerSuperFlash(this.def, this.x, this.y);
       } else {
         // 通常必殺技（ゲージ1/3消費）
         this.state='special';this.st=0;this.specialFired=false;this.punchFired=false;
@@ -1197,23 +1233,53 @@ class Fighter {
       ctx.fillStyle='#ff8800'; ctx.font='bold 10px sans-serif'; ctx.textAlign='center';
       ctx.fillText('⚡弱体',this.x,this.y-(150*this.def.scale));
     }
-    // Special gauge ready glow
-    if (this.specialGauge>=this.maxSpecialGauge) {
-      const pulse=0.45+0.45*Math.sin(Date.now()/110);
-      ctx.save();
-      ctx.globalAlpha=pulse*0.5; ctx.fillStyle=this.def.c1;
-      ctx.shadowBlur=32; ctx.shadowColor=this.def.c1;
-      ctx.beginPath(); ctx.arc(this.x,this.y-65*this.def.scale,55*this.def.scale,0,Math.PI*2); ctx.fill();
-      ctx.shadowBlur=0; ctx.globalAlpha=1; ctx.restore();
-      const t2=Date.now();
-      for (let i=0;i<5;i++) {
-        const ang=(t2/480+i/5)*Math.PI*2;
-        const r=48*this.def.scale;
-        ctx.globalAlpha=0.75*(0.5+0.5*Math.sin(t2/90+i*1.3));
-        ctx.fillStyle=this.def.c1;
-        ctx.beginPath(); ctx.arc(this.x+Math.cos(ang)*r,this.y-65*this.def.scale+Math.sin(ang)*r*0.6,4,0,Math.PI*2); ctx.fill();
+    // Special gauge ready glow (2-level)
+    const _minG=Math.floor(this.maxSpecialGauge/3);
+    if (this.specialGauge>=_minG) {
+      const sc=this.def.scale, cy=this.y-65*sc, t2=Date.now();
+      if (this.specialGauge>=this.maxSpecialGauge) {
+        // 超必殺 ready: dramatic aura + dual rings + 8 particles + label
+        const pulse=0.5+0.5*Math.sin(t2/90), pulse2=0.5+0.5*Math.sin(t2/55+1.5);
+        ctx.save();
+        ctx.globalAlpha=pulse*0.52; ctx.fillStyle=this.def.c1;
+        ctx.shadowBlur=52; ctx.shadowColor=this.def.c1;
+        ctx.beginPath(); ctx.arc(this.x,cy,74*sc,0,Math.PI*2); ctx.fill();
+        ctx.globalAlpha=pulse2*0.28; ctx.fillStyle='#ffffff'; ctx.shadowColor='#ffffff';
+        ctx.beginPath(); ctx.arc(this.x,cy,42*sc,0,Math.PI*2); ctx.fill();
+        ctx.shadowBlur=0; ctx.restore();
+        const ra=t2/600;
+        ctx.strokeStyle=this.def.c1; ctx.lineWidth=3; ctx.globalAlpha=0.65+0.35*pulse;
+        ctx.beginPath();
+        for (let i=0;i<12;i++){const a1=ra+i/12*Math.PI*2,a2=ra+(i+0.65)/12*Math.PI*2,r=64*sc;ctx.moveTo(this.x+Math.cos(a1)*r,cy+Math.sin(a1)*r*0.62);ctx.lineTo(this.x+Math.cos(a2)*r,cy+Math.sin(a2)*r*0.62);}
+        ctx.stroke();
+        const ra2=-t2/380;
+        ctx.strokeStyle='#ffffff'; ctx.lineWidth=2; ctx.globalAlpha=0.5+0.5*pulse2;
+        ctx.beginPath();
+        for (let i=0;i<8;i++){const a1=ra2+i/8*Math.PI*2,a2=ra2+(i+0.55)/8*Math.PI*2,r=46*sc;ctx.moveTo(this.x+Math.cos(a1)*r,cy+Math.sin(a1)*r*0.58);ctx.lineTo(this.x+Math.cos(a2)*r,cy+Math.sin(a2)*r*0.58);}
+        ctx.stroke();
+        for (let i=0;i<8;i++){
+          const ang=(t2/360+i/8)*Math.PI*2, r=60*sc;
+          ctx.globalAlpha=0.9*(0.5+0.5*Math.sin(t2/75+i*0.8));
+          ctx.fillStyle=(i%2===0)?this.def.c1:'#ffffff';
+          ctx.beginPath(); ctx.arc(this.x+Math.cos(ang)*r,cy+Math.sin(ang)*r*0.6,5,0,Math.PI*2); ctx.fill();
+        }
+        ctx.globalAlpha=1;
+        const lblA=0.72+0.28*Math.sin(t2/110);
+        ctx.globalAlpha=lblA; ctx.font='bold 12px sans-serif'; ctx.textAlign='center';
+        ctx.strokeStyle='#000'; ctx.lineWidth=3;
+        ctx.strokeText('超必殺 READY!',this.x,cy-80*sc);
+        ctx.fillStyle='#ffffff'; ctx.fillText('超必殺 READY!',this.x,cy-80*sc);
+        ctx.globalAlpha=1;
+      } else {
+        // 通常必殺 ready: soft pulsing aura only
+        const pulse=0.28+0.28*Math.sin(t2/210);
+        ctx.save();
+        ctx.globalAlpha=pulse; ctx.fillStyle=this.def.c1;
+        ctx.shadowBlur=20; ctx.shadowColor=this.def.c1;
+        ctx.beginPath(); ctx.arc(this.x,cy,40*sc,0,Math.PI*2); ctx.fill();
+        ctx.shadowBlur=0; ctx.restore();
+        ctx.globalAlpha=1;
       }
-      ctx.globalAlpha=1;
     }
 
     // ガードエフェクト (立ち=縦弧、しゃがみ=横型低バリア)
@@ -2232,6 +2298,7 @@ function loop() {
   drawHUD();
   drawFlashMsg();
   drawSpecialBanner();
+  drawSuperFlash();
   drawExitButton();
   if (!IS_TOUCH) {
     ctx.fillStyle='rgba(255,255,255,0.25)'; ctx.font='11px monospace'; ctx.textAlign='center';
