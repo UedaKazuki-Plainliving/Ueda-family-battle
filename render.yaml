@@ -1,0 +1,9 @@
+services:
+  - type: web
+    name: ueda-family-battle
+    runtime: node
+    buildCommand: npm install --omit=dev
+    startCommand: node server.js
+    envVars:
+      - key: NODE_ENV
+        value: production
