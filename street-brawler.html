@@ -4504,33 +4504,41 @@ class Fighter {
       // キック3段階モーション
       const kickPhase = this.st - def.kickS;
       const kickRange = def.kickE - def.kickS;
+      const shoe=(fx,fy,ang)=>{ // 靴（甲＋靴底）。ang: つま先方向の角度
+        ctx.save(); ctx.translate(fx,fy); ctx.rotate(ang);
+        ctx.fillStyle=c2; ctx.beginPath(); ctx.ellipse(lw*0.3,0,lw*1.15,lw*0.6,0,0,Math.PI*2); ctx.fill();
+        ctx.fillStyle='rgba(0,0,0,0.3)'; ctx.beginPath(); ctx.ellipse(lw*0.3,lw*0.34,lw*1.1,lw*0.24,0,0,Math.PI*2); ctx.fill();
+        ctx.restore();
+      };
       if (kickPhase < kickRange * 0.36) {
         // 前半: ひざを上げる
         const t = kickPhase / (kickRange * 0.36);
         const kneeRaise = t * 28;
         // 軸足: 少し屈む
         ctx.beginPath(); ctx.moveTo(0,footY+6); ctx.lineTo(-10,-36+4); ctx.stroke();
+        shoe(-10,-32,0.15);
         // 蹴り足: ひざ高く
         ctx.beginPath(); ctx.moveTo(0,footY+6); ctx.lineTo(16,-26-kneeRaise); ctx.stroke();
         ctx.beginPath(); ctx.moveTo(16,-26-kneeRaise); ctx.lineTo(24,-16-kneeRaise+10); ctx.stroke();
+        shoe(24,-6-kneeRaise,0.9);
       } else if (kickPhase < kickRange * 0.72) {
         // 中盤: 蹴り出し
         const t = (kickPhase - kickRange*0.36) / (kickRange * 0.36);
         const ext = t;
         ctx.beginPath(); ctx.moveTo(0,footY+4); ctx.lineTo(-8,-36+3); ctx.stroke();
+        shoe(-8,-33,0.1);
         ctx.beginPath(); ctx.moveTo(0,footY+4); ctx.lineTo(20+ext*22,-26+ext*14); ctx.stroke();
         ctx.beginPath(); ctx.moveTo(20+ext*22,-26+ext*14); ctx.lineTo(42+ext*14,-10+ext*2); ctx.stroke();
-        // つま先（小さな線）
-        ctx.lineWidth=lw*0.7;
-        ctx.beginPath(); ctx.moveTo(42+ext*14,-10+ext*2); ctx.lineTo(50+ext*14,-8+ext*2); ctx.stroke();
-        ctx.lineWidth=lw;
+        shoe(42+ext*14,-10+ext*2,1.45);
       } else {
         // 後半: 足が戻る
         const t = (kickPhase - kickRange*0.72) / (kickRange * 0.28);
         const ret = t;
         ctx.beginPath(); ctx.moveTo(0,footY+2); ctx.lineTo(-9,-36+2); ctx.stroke();
+        shoe(-9,-34,0.1);
         ctx.beginPath(); ctx.moveTo(0,footY+2); ctx.lineTo(30-ret*20,-14+ret*2); ctx.stroke();
         ctx.beginPath(); ctx.moveTo(30-ret*20,-14+ret*2); ctx.lineTo(46-ret*28,-8+ret*2); ctx.stroke();
+        shoe(46-ret*28,-8+ret*2,1.2-ret*0.5);
       }
     } else if (crouching) {
       // しゃがみ: 両ひざを外に開く安定姿勢
@@ -4627,6 +4635,9 @@ class Fighter {
         ctx.lineWidth=lw; ctx.strokeStyle=c1;
         // 反対の腕（左腕）: ガードのように顔の前に構える
         ctx.beginPath(); ctx.moveTo(-bw/2+4,aY); ctx.lineTo(-bw/2+16,aY-18); ctx.stroke();
+        ctx.fillStyle='#FFCC99';
+        ctx.beginPath(); ctx.arc(-bw/2+16,aY-18,lw*0.7,0,Math.PI*2); ctx.fill();
+        ctx.lineWidth=lw; ctx.strokeStyle=c1;
       } else {
         // 後半: 腕が少し引き戻される（フォロースルー）
         const t = (punchPhase - punchHalf) / (punchRange - punchHalf);
@@ -4636,7 +4647,24 @@ class Fighter {
         ctx.beginPath(); ctx.arc(bw/2+40-pullback,aY,lw*0.85,0,Math.PI*2); ctx.fill();
         ctx.lineWidth=lw; ctx.strokeStyle=c1;
         ctx.beginPath(); ctx.moveTo(-bw/2+4,aY); ctx.lineTo(-bw/2+16,aY-14); ctx.stroke();
+        ctx.fillStyle='#FFCC99';
+        ctx.beginPath(); ctx.arc(-bw/2+16,aY-14,lw*0.65,0,Math.PI*2); ctx.fill();
+        ctx.lineWidth=lw; ctx.strokeStyle=c1;
       }
+    } else if (s==='punch' && this.st<def.punchS && def.id!=='otousan') {
+      // 予備動作（チャンバー）: 肘を曲げて拳を腰へ引き、力を溜める
+      const w=Math.min(1,this.st/Math.max(1,def.punchS));
+      const elbowX=bw/2+3, elbowY=aY+3+w*2;
+      const fistX=bw/2-8-w*3, fistY=aY+16+w*5;
+      ctx.beginPath(); ctx.moveTo(bw/2-4,aY); ctx.lineTo(elbowX,elbowY); ctx.stroke();
+      ctx.beginPath(); ctx.moveTo(elbowX,elbowY); ctx.lineTo(fistX,fistY); ctx.stroke();
+      ctx.fillStyle='#FFCC99';
+      ctx.beginPath(); ctx.arc(fistX,fistY,lw*0.78,0,Math.PI*2); ctx.fill();
+      ctx.lineWidth=lw; ctx.strokeStyle=c1;
+      ctx.beginPath(); ctx.moveTo(-bw/2+4,aY); ctx.lineTo(-bw/2+14,aY-10-w*4); ctx.stroke();
+      ctx.fillStyle='#FFCC99';
+      ctx.beginPath(); ctx.arc(-bw/2+14,aY-10-w*4,lw*0.65,0,Math.PI*2); ctx.fill();
+      ctx.lineWidth=lw; ctx.strokeStyle=c1;
     } else if (def.id==='otousan'&&s==='punch') {
       const windup=Math.min(1,this.st/18);
       ctx.beginPath(); ctx.moveTo(-bw/2+4,aY); ctx.lineTo(-bw/2-20-windup*15,aY-21-windup*10); ctx.stroke();
