@@ -99,7 +99,7 @@ function setup2PTouchCanvas() {
 }
 function resetCanvas() {
   canvas.height = H; CANVAS_H = H;
-  canvas.style.cssText = 'display:block;width:100vw;height:auto;touch-action:none;-webkit-user-select:none;user-select:none;';
+  canvas.style.cssText = 'display:block;height:auto;touch-action:none;-webkit-user-select:none;user-select:none;';
 }
 
 // ---- Seeded PRNG (gameplay uses this for determinism across clients) ----
@@ -248,7 +248,7 @@ canvas.addEventListener('pointerdown', e => {
     const scaleX = W / rect.width, scaleY2 = H / rect.height;
     const tx = (e.clientX - rect.left) * scaleX;
     const tcy = (e.clientY - rect.top) * scaleY2;
-    const CS_COLS=6, CS_PW=124, CS_PH=185, CS_GAP=8, CS_SX=8, CS_SY=68;
+    const CS_COLS=9, CS_PW=84, CS_PH=185, CS_GAP=4, CS_SX=6, CS_SY=68;
     for (let idx=0; idx<CHAR_LIST.length; idx++) {
       const col=idx%CS_COLS, row=Math.floor(idx/CS_COLS);
       const px=CS_SX+col*(CS_PW+CS_GAP), py=CS_SY+row*(CS_PH+CS_GAP);
@@ -266,7 +266,7 @@ canvas.addEventListener('pointerdown', e => {
     const scaleX = W / rect.width, scaleY2 = H / rect.height;
     const tx = (e.clientX - rect.left) * scaleX;
     const tcy = (e.clientY - rect.top) * scaleY2;
-    const bw=340,bh=250,gap=20;
+    const gap=20,bh=250,bw=Math.min(340,(W-40-(STAGE_COUNT-1)*gap)/STAGE_COUNT);
     const sx=(W-STAGE_COUNT*bw-(STAGE_COUNT-1)*gap)/2;
     const by=88;
     for (let i=0;i<STAGE_COUNT;i++) {
@@ -312,8 +312,8 @@ const CHARS = {
     punchS:2, punchE:8, kickS:5, kickE:18, jatkS:3, jatkE:12,
     rangeBonus:1.0, hitStunGiven:16, pushback:12,
     scale:0.70, limbW:5, bodyW:15, hairStyle:'bobboy',
-    specialName:'ドラゴンソード', superName:'アイスドラゴン召喚', desc:'スピードタイプ',
-    flavor:['動きが速い！','攻撃連打が得意','パワーは低め'],
+    specialName:'ファイヤートルネード', superName:'隕石', desc:'スピードタイプ',
+    flavor:['火の竜巻で吸い込みダメージ！','隕石を10個ランダムに落とす！','動きが速い'],
   },
   yuuri: {
     id:'yuuri', name:'ゆうり', c1:'#eeeeee', c2:'#dddddd',
@@ -345,8 +345,8 @@ const CHARS = {
     punchS:18, punchE:18, kickS:9, kickE:28, jatkS:6, jatkE:18,
     punchIsProjectile:true, rangeBonus:1.0, hitStunGiven:22, pushback:14,
     scale:1.20, limbW:7, bodyW:20, hairStyle:'perm',
-    specialName:'沢山しゃべる', superName:'ブラックホール', desc:'飛び道具タイプ',
-    flavor:['パンチ→野球ボール！','動きはかなり遅め','技の隙が大きい'],
+    specialName:'津波', superName:'水の玉', desc:'飛び道具タイプ',
+    flavor:['津波で押し込みダメージ！','水の玉が20秒追尾→5秒閉じ込め！','動きはかなり遅め'],
   },
   okaasan: {
     id:'okaasan', name:'おかあさん', c1:'#ee44aa', c2:'#ff88cc',
@@ -458,13 +458,58 @@ const CHARS = {
     specialName:'術式順転「蒼」', superName:'虚式「茈」', desc:'無限呪術師',
     flavor:['蒼で引き寄せダメージ！','茈で相手を止めて攻撃！','最強の呪術師！'],
   },
+  zenitsu: {
+    id:'zenitsu', name:'善逸', c1:'#ffcc22', c2:'#ff8800',
+    walkSpd:6.8, jumpVel:-20, gravity:0.66,
+    punchDmg:8, kickDmg:10, jatkDmg:10,
+    punchDur:11, kickDur:24, jatkDur:13,
+    punchS:2, punchE:8, kickS:4, kickE:16, jatkS:3, jatkE:11,
+    rangeBonus:1.0, hitStunGiven:15, pushback:12,
+    scale:0.95, limbW:7, bodyW:21, hairStyle:'zenitsu',
+    specialName:'霹靂一閃', superName:'火雷神', desc:'雷の呼吸',
+    flavor:['前へ瞬間移動して斬る！','火雷神は雷を纏って突撃→爆発！','スピード最速クラス'],
+  },
+  rengoku: {
+    id:'rengoku', name:'煉獄', c1:'#ff5511', c2:'#ffcc00',
+    walkSpd:5.0, jumpVel:-18, gravity:0.80,
+    punchDmg:10, kickDmg:13, jatkDmg:12,
+    punchDur:15, kickDur:28, jatkDur:17,
+    punchS:3, punchE:10, kickS:5, kickE:19, jatkS:4, jatkE:13,
+    rangeBonus:1.1, hitStunGiven:19, pushback:16,
+    scale:1.05, limbW:9, bodyW:26, hairStyle:'rengoku',
+    specialName:'炎の呼吸 伍ノ型 炎虎', superName:'奥義 煉獄', desc:'炎柱',
+    flavor:['炎の虎が突進する！','奥義は相手を止めて炎で斬る！','攻防ともに熱い炎柱'],
+  },
+  tanjiro: {
+    id:'tanjiro', name:'竈門炭治郎', c1:'#1a6b3a', c2:'#101418',
+    walkSpd:5.6, jumpVel:-19, gravity:0.75,
+    punchDmg:9, kickDmg:12, jatkDmg:11,
+    punchDur:14, kickDur:28, jatkDur:16,
+    punchS:3, punchE:10, kickS:5, kickE:19, jatkS:4, jatkE:12,
+    rangeBonus:1.05, hitStunGiven:18, pushback:15,
+    scale:0.98, limbW:8, bodyW:23, hairStyle:'tanjiro',
+    specialName:'円舞', superName:'火車', desc:'水/日の呼吸',
+    flavor:['円舞で周囲に炎、近づく敵にダメージ！','火車で飛びかかって10秒燃焼！','攻守バランス型'],
+  },
+  akaza: {
+    id:'akaza', name:'猗窩座', c1:'#e05a7a', c2:'#3a4a7a',
+    walkSpd:5.2, jumpVel:-18, gravity:0.85,
+    punchDmg:12, kickDmg:12, jatkDmg:12,
+    punchDur:12, kickDur:26, jatkDur:14,
+    punchS:2, punchE:9, kickS:5, kickE:18, jatkS:3, jatkE:11,
+    rangeBonus:1.0, hitStunGiven:18, pushback:16,
+    scale:1.02, limbW:10, bodyW:25, hairStyle:'akaza',
+    specialName:'破壊殺・羅針', superName:'スーパーパンチ', desc:'上弦の参',
+    flavor:['羅針でパンチ/速度/ジャンプUP！','スーパーパンチで止めて10連打！','接近戦の鬼'],
+  },
 };
-const CHAR_LIST = [CHARS.icchi, CHARS.yuuri, CHARS.soyo, CHARS.otousan, CHARS.okaasan, CHARS.kuppa, CHARS.kinopio, CHARS.mario, CHARS.luigi, CHARS.pikachu, CHARS.kirby, CHARS.doraemon, CHARS.jogo, CHARS.gojo];
+const CHAR_LIST = [CHARS.icchi, CHARS.yuuri, CHARS.soyo, CHARS.otousan, CHARS.okaasan, CHARS.kuppa, CHARS.kinopio, CHARS.mario, CHARS.luigi, CHARS.pikachu, CHARS.kirby, CHARS.doraemon, CHARS.jogo, CHARS.gojo, CHARS.zenitsu, CHARS.rengoku, CHARS.tanjiro, CHARS.akaza];
 
 // ---- Stage Definitions ----
 const STAGES = [
   {name:'夜の街', desc:'夜の都会', note:''},
   {name:'上田家', desc:'リビングルーム', note:'鉛筆ハザードあり'},
+  {name:'学校', desc:'教室（生徒15人＆先生）', note:'10秒で生徒起立／先生を叩くと激怒'},
 ];
 const STAGE_COUNT = STAGES.length;
 let selectedStage = 0;
@@ -562,6 +607,7 @@ const buildings = [];
 })();
 
 function drawBackground() {
+  if (selectedStage===2) { drawStageSchool(); return; }
   if (selectedStage===1) { drawStageUedaFamily(); return; }
   const sky = ctx.createLinearGradient(0,0,0,GROUND);
   sky.addColorStop(0,'#100828'); sky.addColorStop(1,'#3a1808');
@@ -590,7 +636,7 @@ function drawStageSelect() {
   ctx.fillText('ステージ選択', W/2, 48);
   ctx.font='13px sans-serif'; ctx.fillStyle='#aaa';
   ctx.fillText(IS_TOUCH?'タップで選択　もう一度タップで決定':'← → で選択　　Space / Enter で決定', W/2, 70);
-  const bw=340,bh=250,gap=20;
+  const gap=20,bh=250,bw=Math.min(340,(W-40-(STAGE_COUNT-1)*gap)/STAGE_COUNT);
   const sx=(W-STAGE_COUNT*bw-(STAGE_COUNT-1)*gap)/2;
   STAGES.forEach((s,i)=>{
     const bx=sx+i*(bw+gap), by=88;
@@ -612,12 +658,19 @@ function drawStageSelect() {
       [[0,0.45],[0.25,0.35],[0.5,0.55],[0.75,0.4]].forEach(([rx,rh])=>{
         ctx.fillRect(bx+6+rx*pw, by+6+ph*(1-rh), pw*0.22, ph*rh);
       });
-    } else {
+    } else if (i===1) {
       ctx.fillStyle='#f0e2c8'; ctx.fillRect(bx+6,by+6,pw,ph);
       ctx.fillStyle='#c8966a'; ctx.fillRect(bx+6,by+6+ph*0.72,pw,ph*0.28);
       ctx.fillStyle='#8b3e25'; ctx.fillRect(bx+8,by+6+ph*0.5,pw*0.22,ph*0.22);
       ctx.fillStyle='#1a1a1a'; ctx.fillRect(bx+6+pw*0.78,by+6+ph*0.22,pw*0.18,ph*0.48);
       ctx.fillStyle='#8B6030'; ctx.fillRect(bx+6+pw*0.38,by+6+ph*0.55,pw*0.25,ph*0.05);
+    } else {
+      ctx.fillStyle='#dfeaf0'; ctx.fillRect(bx+6,by+6,pw,ph);
+      ctx.fillStyle='#2f5d3f'; ctx.fillRect(bx+6+pw*0.08,by+6+ph*0.10,pw*0.5,ph*0.28);  // 黒板
+      ctx.fillStyle='#bfe6f7'; ctx.fillRect(bx+6+pw*0.66,by+6+ph*0.10,pw*0.28,ph*0.30); // 窓
+      ctx.fillStyle='#d8c19a'; ctx.fillRect(bx+6,by+6+ph*0.74,pw,ph*0.26);              // 床
+      ctx.fillStyle='#caa06a'; [0.20,0.45,0.70].forEach(rx=>ctx.fillRect(bx+6+pw*rx,by+6+ph*0.58,pw*0.14,ph*0.03)); // 机
+      ctx.fillStyle='#6b7b8c'; ctx.fillRect(bx+6+pw*0.50,by+6+ph*0.60,pw*0.05,ph*0.14); // 先生
     }
     ctx.restore();
     ctx.fillStyle=sel?'#ffdd00':'#ccc'; ctx.font='bold 18px sans-serif'; ctx.textAlign='center';
@@ -691,6 +744,176 @@ function drawPencils() {
     }
     ctx.restore();
   });
+}
+
+// ---- Stage: 学校（生徒15人＆先生ハザード） ----
+let students = [];
+let teacher = null;
+let schoolTimer = 0;
+let schoolMarks = [];
+const SCH_STAND_DELAY = 600;   // 10秒(60fps)で生徒が起立
+const SCH_STU_SPD = 1.3;       // 生徒の移動速度
+const SCH_STU_CATCH = 26;      // 生徒の捕獲距離
+const SCH_STU_COOLDOWN = 300;  // 叩いた後の着席クールダウン(5秒)
+const SCH_STU_HIT = {dmg:4,stun:14,push:12,type:'special'};
+const SCH_TEACH_SPD = 1.0;     // 先生の徘徊速度
+const SCH_TEACH_CHASE = 2.3;   // 激怒時の追跡速度
+const SCH_TEACH_CATCH = 30;    // 先生の捕獲距離
+const SCH_TEACH_HIT = {dmg:11,stun:22,push:18,type:'special'}; // 二発ぶん
+const SCH_DESKS = [];
+
+function initSchoolStage(){
+  students=[]; teacher=null; schoolTimer=0; schoolMarks=[]; SCH_DESKS.length=0;
+  const rows=[{y:214,sc:0.72},{y:262,sc:0.85},{y:312,sc:1.0}]; // 奥ほど上・小さい
+  const cols=5;
+  const pal=['#e2445b','#3aa9a8','#3f7fcc','#e39328','#7fbf3f','#c05fc0','#28b8c8','#e2745b'];
+  rows.forEach((r,ri)=>{
+    const margin=96;
+    for(let c=0;c<cols;c++){
+      const x=margin + c*((W-2*margin)/(cols-1));
+      SCH_DESKS.push({x,y:r.y,sc:r.sc});
+      students.push({hx:x,hy:r.y,x,y:r.y,sc:r.sc,face:1,col:pal[(ri*cols+c)%pal.length],state:'seated',nextActive:SCH_STAND_DELAY,hitCd:0,wob:Math.random()*6.28});
+    }
+  });
+  teacher={x:W/2,y:GROUND,dir:1,state:'patrol',target:null,angryT:0,hitCd:0,step:0};
+}
+function schAlive(p1,p2){ return [p1,p2].filter(p=>p&&p.hp>0); }
+function schNearest(x,fs){ let b=null,bd=1e9; for(const f of fs){const d=Math.abs(f.x-x); if(d<bd){bd=d;b=f;}} return b; }
+function schNorm(hb){ const x=hb.w<0?hb.x+hb.w:hb.x; return {x,y:hb.y,w:Math.abs(hb.w),h:hb.h}; }
+function schRectHit(a,b){ return a.x<b.x+b.w && a.x+a.w>b.x && a.y<b.y+b.h && a.y+a.h>b.y; }
+function schMark(x,y,txt,col){ schoolMarks.push({x,y,txt,col:col||'#ff3b30',t:50}); }
+
+function updateSchool(p1,p2){
+  schoolTimer++;
+  const fs=schAlive(p1,p2);
+  // --- 生徒 ---
+  for(const s of students){
+    if(s.hitCd>0) s.hitCd--;
+    if(s.state==='seated'){
+      s.wob+=0.05;
+      if(schoolTimer>=s.nextActive && fs.length){ s.state='chase'; beep(300,'square',0.05,0.07); }
+    } else if(s.state==='chase'){
+      const tgt=schNearest(s.x,fs);
+      if(!tgt){ s.state='return'; continue; }
+      if(s.y<GROUND) s.y=Math.min(GROUND,s.y+2.6);
+      s.face=Math.sign(tgt.x-s.x)||s.face;
+      s.x+=s.face*SCH_STU_SPD;
+      if(Math.abs(tgt.x-s.x)<SCH_STU_CATCH && s.y>=GROUND-2 && s.hitCd<=0 && tgt.onGround && tgt.hitStun===0){
+        if(tgt.takeHit(SCH_STU_HIT, tgt.x<s.x?-1:1)){ spawnHit(tgt.x,tgt.y-46); beep(360,'square',0.08,0.16); schMark(tgt.x,tgt.y-70,'ペチ'); }
+        s.hitCd=SCH_STU_COOLDOWN; s.state='return';
+      }
+    } else if(s.state==='return'){
+      s.face=Math.sign(s.hx-s.x)||s.face;
+      s.x+=s.face*(SCH_STU_SPD+0.6);
+      if(s.y>s.hy) s.y=Math.max(s.hy,s.y-2.6);
+      if(Math.abs(s.hx-s.x)<3 && Math.abs(s.hy-s.y)<3){ s.x=s.hx; s.y=s.hy; s.state='seated'; s.nextActive=schoolTimer+SCH_STU_COOLDOWN; }
+    }
+  }
+  // --- 先生 ---
+  const t=teacher; if(!t) return;
+  if(t.hitCd>0) t.hitCd--;
+  t.step+=1;
+  if(t.hitCd<=0 && t.state!=='angry'){
+    const trect={x:t.x-16,y:GROUND-74,w:32,h:74};
+    for(const p of fs){
+      const hb=p.hitbox&&p.hitbox();
+      if(hb && schRectHit(schNorm(hb),trect)){
+        t.state='angry'; t.target=p; t.angryT=480; t.hitCd=30;
+        spawnHit(t.x,GROUND-70,true); schMark(t.x,GROUND-92,'💢','#ff3b30'); beep(170,'sawtooth',0.2,0.3);
+        break;
+      }
+    }
+  }
+  if(t.state==='patrol'){
+    t.x+=t.dir*SCH_TEACH_SPD;
+    if(t.x<70){t.x=70;t.dir=1;} if(t.x>W-70){t.x=W-70;t.dir=-1;}
+  } else {
+    const tg=(t.target&&t.target.hp>0)?t.target:schNearest(t.x,fs);
+    if(!tg||--t.angryT<=0){ t.state='patrol'; t.target=null; }
+    else {
+      t.dir=Math.sign(tg.x-t.x)||t.dir;
+      t.x=Math.max(50,Math.min(W-50,t.x+t.dir*SCH_TEACH_CHASE));
+      if(Math.abs(tg.x-t.x)<SCH_TEACH_CATCH && tg.onGround && tg.hitStun===0){
+        if(tg.takeHit(SCH_TEACH_HIT, tg.x<t.x?-1:1)){ spawnHit(tg.x,tg.y-52,true); spawnHit(tg.x-6,tg.y-66); beep(320,'sawtooth',0.12,0.26); schMark(tg.x,tg.y-84,'2発!','#ffcc00'); }
+        t.state='patrol'; t.target=null; t.hitCd=120;
+      }
+    }
+  }
+}
+
+// 背景（教室）——drawBackgroundから呼ばれる
+function drawStageSchool(){
+  ctx.fillStyle='#cfe3ec'; ctx.fillRect(0,0,W,GROUND);
+  ctx.fillStyle='#e7eef2'; ctx.fillRect(0,96,W,GROUND-96);
+  // 窓（右）
+  ctx.fillStyle='#bfe6f7'; ctx.fillRect(566,54,196,132);
+  ctx.fillStyle='rgba(255,255,255,0.35)'; ctx.fillRect(566,54,196,40);
+  ctx.strokeStyle='#8fb4cc'; ctx.lineWidth=5; ctx.strokeRect(566,54,196,132);
+  ctx.lineWidth=3; ctx.beginPath(); ctx.moveTo(664,54); ctx.lineTo(664,186); ctx.moveTo(566,120); ctx.lineTo(762,120); ctx.stroke();
+  // 黒板（左〜中）
+  ctx.fillStyle='#2f5d3f'; ctx.fillRect(46,52,430,120);
+  ctx.strokeStyle='#c9a06a'; ctx.lineWidth=9; ctx.strokeRect(46,52,430,120);
+  ctx.fillStyle='rgba(255,255,255,0.75)'; ctx.font='22px sans-serif'; ctx.textAlign='left';
+  ctx.fillText('大乱闘ウエダ学級', 66, 96); ctx.font='16px sans-serif'; ctx.fillText('しずかに たたかいなさい', 66, 132);
+  ctx.fillStyle='#31473b'; ctx.fillRect(46,166,430,8);
+  ctx.fillStyle='#fff'; ctx.fillRect(120,168,20,4); ctx.fillStyle='#fdd'; ctx.fillRect(150,168,15,4);
+  // 床（フローリング）
+  ctx.fillStyle='#d8c19a'; ctx.fillRect(0,GROUND,W,H-GROUND);
+  ctx.fillStyle='#c8ad82'; ctx.fillRect(0,GROUND,W,4);
+  ctx.strokeStyle='#b89a6a'; ctx.lineWidth=1.1;
+  for(let x=0;x<=W;x+=64){ ctx.beginPath(); ctx.moveTo(x,GROUND); ctx.lineTo(x,H); ctx.stroke(); }
+  for(let y=GROUND+16;y<H;y+=18){ ctx.beginPath(); ctx.moveTo(0,y); ctx.lineTo(W,y); ctx.stroke(); }
+  // 机（背景・生徒の座席）
+  for(const d of SCH_DESKS) schDrawDesk(d.x,d.y,d.sc);
+}
+function schDrawDesk(x,y,sc){
+  const w=44*sc, legH=26*sc;
+  ctx.fillStyle='#8f7038'; ctx.fillRect(x-w/2+3,y+2,4*sc,legH); ctx.fillRect(x+w/2-3-4*sc,y+2,4*sc,legH);
+  ctx.fillStyle='#caa06a'; ctx.fillRect(x-w/2,y-5,w,7);
+  ctx.fillStyle='#a87c48'; ctx.fillRect(x-w/2,y-5,w,3);
+  ctx.fillStyle='#7fb0d8'; ctx.fillRect(x-11*sc,y+legH-3,22*sc,4); // 椅子座面
+  ctx.fillStyle='#5f90b8'; ctx.fillRect(x-11*sc,y+legH-3,22*sc,2);
+}
+// 前景（生徒・先生・マーク）——ハザード描画フックから呼ばれる
+function drawSchool(){
+  for(const s of students) schDrawStudent(s);
+  if(teacher) schDrawTeacher(teacher);
+  for(let i=schoolMarks.length-1;i>=0;i--){ const m=schoolMarks[i];
+    ctx.globalAlpha=Math.min(1,m.t/18); ctx.fillStyle=m.col; ctx.font='bold 19px sans-serif'; ctx.textAlign='center';
+    ctx.fillText(m.txt,m.x,m.y-(50-m.t)*0.5); ctx.globalAlpha=1; if(--m.t<=0) schoolMarks.splice(i,1); }
+}
+function schDrawStudent(s){
+  const sc=s.sc, seated=s.state==='seated';
+  ctx.save(); ctx.translate(s.x,s.y);
+  const wob=seated?Math.sin(s.wob)*1.2:0;
+  if(!seated){ ctx.fillStyle='#33384a'; ctx.fillRect(-6*sc,-12*sc,4.5*sc,12*sc); ctx.fillRect(1.5*sc,-12*sc,4.5*sc,12*sc); } // 脚
+  ctx.fillStyle=s.col; // 制服
+  if(seated) ctx.fillRect(-9*sc,-21*sc,18*sc,21*sc); else ctx.fillRect(-9*sc,-31*sc,18*sc,19*sc);
+  const headY=seated?-27*sc:-41*sc;
+  if(!seated){ // 追跡中は前かがみで手を伸ばす
+    ctx.strokeStyle='#ffd9a8'; ctx.lineWidth=3*sc; ctx.beginPath(); ctx.moveTo(0,-24*sc); ctx.lineTo(s.face*12*sc,-20*sc); ctx.stroke();
+  }
+  ctx.fillStyle='#ffd9a8'; ctx.beginPath(); ctx.arc(wob,headY,8*sc,0,Math.PI*2); ctx.fill(); // 頭
+  ctx.fillStyle='#3a2a1a'; ctx.beginPath(); ctx.arc(wob,headY-1.5*sc,8*sc,Math.PI,0); ctx.fill(); // 髪
+  if(!seated){ ctx.fillStyle='#222'; ctx.fillRect(wob+s.face*2*sc-1,headY-1,2,2); } // 目
+  ctx.restore();
+}
+function schDrawTeacher(t){
+  const angry=t.state==='angry';
+  const bob=Math.sin(t.step*0.2)*1.5;
+  ctx.save(); ctx.translate(t.x,GROUND);
+  ctx.fillStyle='#333'; ctx.fillRect(-8,-22,6,22); ctx.fillRect(2,-22,6,22); // 脚
+  ctx.fillStyle=angry?'#b5484a':'#6b7b8c'; ctx.fillRect(-13,-54+bob*0,26,32); // 上着
+  ctx.fillStyle='#e8e8e8'; ctx.fillRect(-5,-54,10,32); // シャツ
+  ctx.fillStyle='#c0392b'; ctx.fillRect(-2,-54,4,15); // ネクタイ
+  ctx.fillStyle='#ffd9a8'; ctx.beginPath(); ctx.arc(0,-64+bob,11,0,Math.PI*2); ctx.fill(); // 頭
+  ctx.fillStyle='#222'; ctx.beginPath(); ctx.arc(0,-66+bob,11,Math.PI,0); ctx.fill(); // 髪
+  ctx.strokeStyle='#222'; ctx.lineWidth=1.5; ctx.strokeRect(-8,-66+bob,6,5); ctx.strokeRect(2,-66+bob,6,5); // メガネ
+  if(angry){ ctx.strokeStyle='#c0392b'; ctx.lineWidth=2; ctx.beginPath(); ctx.moveTo(-9,-72+bob); ctx.lineTo(-3,-68+bob); ctx.moveTo(9,-72+bob); ctx.lineTo(3,-68+bob); ctx.stroke(); }
+  // 指し棒
+  ctx.strokeStyle='#8a5a2a'; ctx.lineWidth=2.5; ctx.beginPath(); ctx.moveTo(t.dir*8,-38); ctx.lineTo(t.dir*26,-30); ctx.stroke();
+  ctx.restore();
+  if(angry){ ctx.fillStyle='#ff3b30'; ctx.font='16px sans-serif'; ctx.textAlign='center'; ctx.fillText('💢',t.x+18,GROUND-76); }
 }
 
 // ---- Effects ----
@@ -839,6 +1062,14 @@ function spawnFireball(owner, big=false) {
     owner, t:110, dmg:big?10:6, stun:big?16:10, push:big?18:12, big, bounced:0});
   beep(big?160:320,'sawtooth',0.1,0.25);
 }
+function spawnFlameTiger(owner, opp) {
+  const ty = opp ? Math.max(60, Math.min(GROUND-20, opp.y-55)) : owner.y-60*owner.def.scale;
+  projectiles.push({type:'flametiger', x:owner.x+owner.dir*46*owner.def.scale,
+    y:owner.y-60*owner.def.scale, vx:owner.dir*10, vy:0, ty,
+    owner, t:95, dmg:16, stun:24, push:26});
+  beep(150,'sawtooth',0.2,0.4); setTimeout(()=>beep(90,'sawtooth',0.18,0.32),70);
+  setTimeout(()=>beep(70,'square',0.12,0.25),140);
+}
 
 function spawnAirgun(owner) {
   projectiles.push({type:'airgun', x:owner.x+owner.dir*55*owner.def.scale,
@@ -874,6 +1105,29 @@ function spawnThunderbolt(owner, big=false) {
   beep(big?130:260,'sine',0.18,big?0.28:0.2);
   setTimeout(()=>beep(big?260:520,'square',0.1,0.15),55);
 }
+function spawnFireTornado(owner) {
+  // いっちー 中必殺: 火の竜巻。相手を吸い込みつつ周期ダメージ
+  projectiles.push({type:'firetornado', x:owner.x+owner.dir*40*owner.def.scale,
+    y:GROUND-45, vx:owner.dir*3.5, owner, t:130, dmg:0, stun:0, push:0, dotTimer:0});
+  beep(200,'sawtooth',0.2,0.42); setTimeout(()=>beep(140,'sawtooth',0.16,0.35),90);
+}
+function spawnMeteor(owner, tx) {
+  // いっちー 大必殺: 小隕石（落下→着弾で爆発AoE）
+  projectiles.push({type:'meteor', x:tx, y:-30, vx:0, vy:5+gameRand()*2, owner, t:220, dmg:0, stun:0, push:0});
+  beep(520,'sine',0.05,0.12);
+}
+function spawnTsunami(owner) {
+  // おとうさん 中必殺: 津波。当たると押し込み＋周期ダメージ
+  projectiles.push({type:'tsunami', x:owner.x+owner.dir*30*owner.def.scale, y:GROUND-30,
+    vx:owner.dir*5, owner, t:120, dmg:0, stun:0, push:0, dotTimer:0});
+  beep(160,'sine',0.25,0.45); setTimeout(()=>beep(110,'sine',0.2,0.4),120);
+}
+function spawnWaterBall(owner) {
+  // おとうさん 大必殺: 水の玉。20秒追尾→当たると5秒閉じ込め
+  projectiles.push({type:'waterball', x:owner.x+owner.dir*40*owner.def.scale, y:owner.y-60*owner.def.scale,
+    vx:0, vy:0, owner, t:1200, dmg:0, stun:0, push:0, trapped:false});
+  beep(300,'sine',0.15,0.35); setTimeout(()=>beep(220,'sine',0.12,0.3),120);
+}
 
 function updateProjectiles(p1,p2) {
   for (let i=projectiles.length-1;i>=0;i--) {
@@ -902,6 +1156,49 @@ function updateProjectiles(p1,p2) {
           }
         }
       }
+    } else if (proj.type==='flametiger') {
+      // 炎虎: 重力なし、相手の高さへゆるく追尾
+      proj.y += (proj.ty - proj.y)*0.08;
+    } else if (proj.type==='firetornado') {
+      // 火の竜巻: 吸い込み＋周期ダメージ（重力なし）
+      const ttgt=proj.owner===p1?p2:p1;
+      const d=Math.abs(ttgt.x-proj.x);
+      if (d<72 && !ttgt.frozenFrames && ttgt.state!=='special' && ttgt.state!=='super') ttgt.x += (proj.x-ttgt.x)*0.10;
+      if (++proj.dotTimer>=14) { proj.dotTimer=0;
+        if (d<82 && ttgt.hp>0 && ttgt.hitStun===0) {
+          if (ttgt.takeHit({dmg:6,stun:8,push:0,type:'special'}, ttgt.x>=proj.x?1:-1)) { spawnHit(ttgt.x,ttgt.y-50); beep(360,'sawtooth',0.05,0.12); }
+        }
+      }
+    } else if (proj.type==='meteor') {
+      // 隕石: 落下→着弾で爆発AoE
+      proj.vy+=0.35; proj.y+=proj.vy;
+      if (proj.y>=GROUND) {
+        spawnHit(proj.x, GROUND-20, true); spawnHit(proj.x, GROUND-42, true);
+        beep(120,'sawtooth',0.16,0.4);
+        const mt=proj.owner===p1?p2:p1;
+        if (Math.abs(mt.x-proj.x)<72 && mt.hp>0 && mt.hitStun===0) mt.takeHit({dmg:12,stun:16,push:22,type:'special'}, mt.x>=proj.x?1:-1);
+        projectiles.splice(i,1); continue;
+      }
+    } else if (proj.type==='tsunami') {
+      // 津波: 前面の相手を押し込み＋周期ダメージ（重力なし）
+      const ttgt=proj.owner===p1?p2:p1; const dir=proj.vx>0?1:-1;
+      if (Math.abs(ttgt.x-proj.x)<55 && ttgt.hp>0 && ttgt.state!=='special'&&ttgt.state!=='super'&&!ttgt.frozenFrames) {
+        ttgt.x=Math.max(40,Math.min(W-40, ttgt.x+dir*4));
+        if (++proj.dotTimer>=16){ proj.dotTimer=0; if (ttgt.hitStun===0 && ttgt.takeHit({dmg:7,stun:8,push:6,type:'special'},dir)) spawnHit(ttgt.x,ttgt.y-50); }
+      }
+    } else if (proj.type==='waterball') {
+      // 水の玉: ゆっくり追尾→接触で5秒閉じ込め、閉じ込め中は追従
+      const wt=proj.owner===p1?p2:p1;
+      if (proj.trapped) {
+        proj.x=wt.x; proj.y=wt.y-38;
+        if (wt.trapFrames<=0){ projectiles.splice(i,1); continue; }
+      } else {
+        proj.x += ((wt.x)-proj.x)*0.03; proj.y += ((wt.y-40)-proj.y)*0.03;
+        if (Math.abs(wt.x-proj.x)<28 && Math.abs((wt.y-40)-proj.y)<40 && wt.hp>0 && wt.state!=='special'&&wt.state!=='super') {
+          proj.trapped=true; proj.t=320; wt.trapFrames=300; wt.frozenFrames=Math.max(wt.frozenFrames,300);
+          beep(180,'sine',0.22,0.4);
+        }
+      }
     } else if (proj.vy!==undefined){proj.vy+=0.18;proj.y+=proj.vy;
       if(proj.y>=GROUND+5){projectiles.splice(i,1);continue;}
     }
@@ -914,8 +1211,8 @@ function updateProjectiles(p1,p2) {
     const pw=isCentered?44:70;
     const phitR=proj.type==='purpleball'?32:20;
     if (px<hurt.x+hurt.w&&px+pw>hurt.x&&proj.y-phitR<hurt.y+hurt.h&&proj.y+phitR>hurt.y) {
-      if (proj.type==='purpleball') {
-        // 茈は周期ダメージで処理済み(上の dotTimer ブロック) - ここでは一時停止のみ
+      if (proj.type==='purpleball'||proj.type==='firetornado'||proj.type==='meteor'||proj.type==='tsunami'||proj.type==='waterball') {
+        // これらは自前(周期/着弾/閉じ込め)で処理済み。汎用の単発ヒットはしない
       } else if (target.takeHit({dmg:proj.dmg,stun:proj.stun,push:proj.push,type:'special'},proj.vx>0?1:-1)) {
         if (proj.type==='ice') target.frozenFrames=Math.max(target.frozenFrames,140);
         if (proj.type==='baseball'||proj.type==='fire') proj.owner.specialGauge=Math.min(proj.owner.maxSpecialGauge,proj.owner.specialGauge+20);
@@ -985,6 +1282,38 @@ function drawProjectiles() {
       ctx.strokeText('ほげー',p.x,p.y);
       ctx.fillStyle='#ff44bb'; ctx.fillText('ほげー',p.x,p.y);
       ctx.globalAlpha=1; ctx.restore();
+    } else if (p.type==='firetornado') {
+      ctx.save(); ctx.translate(p.x,p.y);
+      const ft=Date.now()/40;
+      for(let i=0;i<11;i++){ const yy=-i*7, rr=7+i*2.3, a=ft+i*0.6;
+        ctx.globalAlpha=Math.max(0.15,0.8-i*0.05); ctx.fillStyle=i%2?'#ff5500':'#ffbb00';
+        ctx.beginPath(); ctx.ellipse(Math.cos(a)*rr, yy, rr, 4, 0, 0, Math.PI*2); ctx.fill(); }
+      ctx.globalAlpha=1; ctx.restore();
+    } else if (p.type==='meteor') {
+      ctx.save(); ctx.translate(p.x,p.y);
+      ctx.globalAlpha=0.5; ctx.fillStyle='#ff8800';
+      ctx.beginPath(); ctx.moveTo(-6,-26); ctx.lineTo(6,-26); ctx.lineTo(0,4); ctx.closePath(); ctx.fill();
+      ctx.globalAlpha=1; ctx.fillStyle='#552200'; ctx.beginPath(); ctx.arc(0,0,8,0,Math.PI*2); ctx.fill();
+      ctx.fillStyle='#ff6600'; ctx.beginPath(); ctx.arc(0,0,5,0,Math.PI*2); ctx.fill();
+      ctx.fillStyle='#ffdd00'; ctx.beginPath(); ctx.arc(-1,-1,2.5,0,Math.PI*2); ctx.fill();
+      ctx.restore();
+    } else if (p.type==='tsunami') {
+      ctx.save(); ctx.translate(p.x,p.y); const dir=p.vx>0?1:-1; ctx.scale(dir,1);
+      const wt=Date.now()/80;
+      ctx.fillStyle='#2a6fdb';
+      ctx.beginPath(); ctx.moveTo(-42,22); ctx.quadraticCurveTo(-10,-32-Math.sin(wt)*6, 22,-8);
+      ctx.quadraticCurveTo(36,4,42,22); ctx.closePath(); ctx.fill();
+      ctx.fillStyle='#5a9fe6'; ctx.beginPath(); ctx.moveTo(-30,22); ctx.quadraticCurveTo(-6,-14,18,-2); ctx.quadraticCurveTo(28,6,30,22); ctx.closePath(); ctx.fill();
+      ctx.fillStyle='#cfe8ff';
+      for(let i=0;i<4;i++){ ctx.globalAlpha=0.8; ctx.beginPath(); ctx.arc(16-i*9, -6-Math.sin(wt+i)*4, 4,0,Math.PI*2); ctx.fill(); }
+      ctx.globalAlpha=1; ctx.restore();
+    } else if (p.type==='waterball') {
+      ctx.save(); ctx.translate(p.x,p.y);
+      const r=p.trapped?32:16;
+      ctx.globalAlpha=0.32; ctx.fillStyle='#3399ff'; ctx.beginPath(); ctx.arc(0,0,r,0,Math.PI*2); ctx.fill();
+      ctx.globalAlpha=0.8; ctx.strokeStyle='#aad4ff'; ctx.lineWidth=2; ctx.beginPath(); ctx.arc(0,0,r,0,Math.PI*2); ctx.stroke();
+      ctx.globalAlpha=0.6; ctx.fillStyle='#eaf6ff'; ctx.beginPath(); ctx.arc(-r*0.3,-r*0.35,r*0.22,0,Math.PI*2); ctx.fill();
+      ctx.globalAlpha=1; ctx.restore();
     } else if (p.type==='ice') {
       ctx.save(); ctx.globalAlpha=0.88;
       ctx.fillStyle='#88eeff'; ctx.strokeStyle='#00aaff'; ctx.lineWidth=2;
@@ -1001,6 +1330,32 @@ function drawProjectiles() {
         ctx.globalAlpha=0.65; ctx.fillStyle='#ff4400';
         ctx.beginPath(); ctx.arc(Math.cos(a)*r*0.7,Math.sin(a)*r*0.4,4,0,Math.PI*2); ctx.fill();
       }
+      ctx.globalAlpha=1; ctx.restore();
+    } else if (p.type==='flametiger') {
+      // 炎の虎
+      ctx.save(); ctx.translate(p.x,p.y); const dir=p.vx>0?1:-1; ctx.scale(dir,1);
+      const ft=Date.now()/45;
+      // 炎の尾
+      ctx.globalAlpha=0.85;
+      for (let i=1;i<=7;i++){ ctx.fillStyle=i%2?'#ff5500':'#ffaa00';
+        ctx.globalAlpha=(8-i)/8*0.8;
+        ctx.beginPath(); ctx.ellipse(-18-i*11, Math.sin(ft+i)*5, 12-i, 9-i*0.6, 0,0,Math.PI*2); ctx.fill(); }
+      ctx.globalAlpha=1;
+      // 体（炎の塊）
+      ctx.fillStyle='#ff6600'; ctx.beginPath(); ctx.ellipse(-6,0,22,15,0,0,Math.PI*2); ctx.fill();
+      ctx.fillStyle='#ffcc00'; ctx.beginPath(); ctx.ellipse(-6,0,13,9,0,0,Math.PI*2); ctx.fill();
+      // 頭
+      ctx.fillStyle='#ff7711'; ctx.beginPath(); ctx.arc(14,-2,13,0,Math.PI*2); ctx.fill();
+      // 耳
+      ctx.beginPath(); ctx.moveTo(6,-12); ctx.lineTo(3,-22); ctx.lineTo(13,-14); ctx.closePath(); ctx.fill();
+      ctx.beginPath(); ctx.moveTo(20,-12); ctx.lineTo(24,-22); ctx.lineTo(14,-14); ctx.closePath(); ctx.fill();
+      // 目・牙
+      ctx.fillStyle='#fff'; ctx.beginPath(); ctx.arc(16,-3,3.2,0,Math.PI*2); ctx.fill();
+      ctx.fillStyle='#330000'; ctx.beginPath(); ctx.arc(17,-3,1.6,0,Math.PI*2); ctx.fill();
+      ctx.fillStyle='#fff'; ctx.beginPath(); ctx.moveTo(20,4); ctx.lineTo(24,4); ctx.lineTo(22,9); ctx.closePath(); ctx.fill();
+      // 揺らめき
+      ctx.globalAlpha=0.6; ctx.fillStyle='#ffee66';
+      for(let i=0;i<3;i++){ ctx.beginPath(); ctx.arc(2+i*6,-12-Math.abs(Math.sin(ft+i))*8,3,0,Math.PI*2); ctx.fill(); }
       ctx.globalAlpha=1; ctx.restore();
     } else if (p.type==='hammer') {
       ctx.save(); ctx.translate(p.x,p.y); ctx.rotate(Date.now()/80+p.x*0.1);
@@ -2036,7 +2391,7 @@ class Fighter {
     this.specialGauge=20; this.maxSpecialGauge=100;
     this.specialVx=0; this.specialFired=false;
     this.superFired=false; this.superPhase=0; this.superTargetX=0; this.superOriginX=0; this.superHitActive=0;
-    this.frozenFrames=0; this.dmgDebuff=0;
+    this.frozenFrames=0; this.dmgDebuff=0; this.burnFrames=0; this.buffFrames=0; this.trapFrames=0;
     this.punchFired=false; this.guardFlash=0; this.guardMode=false;
     this.comboCount=0; this.invincFrames=0;
     this.pose=null;
@@ -2083,6 +2438,7 @@ class Fighter {
     if (!info) return null;
     if (this.dmgDebuff>0) info={...info,dmg:Math.floor(info.dmg*0.55)};
     if (this.bigLightT>0) info={...info,dmg:info.dmg*2};
+    if (this.buffFrames>0&&(info.type==='punch'||info.type==='jatk')) info={...info,dmg:Math.round(info.dmg*1.6),stun:info.stun+4,push:info.push+8};
     return info;
   }
   takeHit(info,fromDir) {
@@ -2154,6 +2510,18 @@ class Fighter {
     if (this.guardFlash>0) this.guardFlash--;
     if (this.invincFrames>0) this.invincFrames--;
     if (this.bigLightT>0) this.bigLightT--;
+    if (this.buffFrames>0) this.buffFrames--;
+    if (this.trapFrames>0){ this.trapFrames--;
+      this.frozenFrames=Math.max(this.frozenFrames,2);   // 水の玉に閉じ込め＝動けない
+      if (this.trapFrames%20===0 && this.hp>0 && this.state!=='dead'){ this.hp-=3; spawnHit(this.x+(Math.random()*16-8),this.y-45); }
+      if (this.hp<=0){ this.hp=0; this.state='dead'; }
+    }
+    if (this.burnFrames>0){ this.burnFrames--;
+      if (this.burnFrames%24===0 && this.hp>0 && this.state!=='dead'){
+        this.hp-=4; spawnHit(this.x+(Math.random()*20-10), this.y-50-Math.random()*30);
+        if(this.hp<=0){ this.hp=0; this.state='dead'; }
+      }
+    }
     this.guardMode=(this.state==='block')||(this.state==='crouch'&&!!inp.block);
 
     if (this.state==='down') {
@@ -2274,8 +2642,89 @@ class Fighter {
           this.superFired=true; spawnPurpleBall(this);
         }
         if (this.st>=65){this.state='idle';this.st=0;this.superPhase=0;}
+      } else if (id==='zenitsu') {
+        // 火雷神: 相手の位置へ瞬間移動して斬り、止まったら爆発
+        if (this.superPhase===0) {
+          this.dir=opp.x>this.x?1:-1;
+          const tx=Math.max(45,Math.min(W-45, opp.x - this.dir*50));
+          const dx=tx-this.x, step=44;
+          if (Math.abs(dx)<=step) { this.x=tx; this.superPhase=1; this.st=0; this.atkHit=false; beep(820,'sawtooth',0.12,0.4); }
+          else this.x+=Math.sign(dx)*step;
+          this.x=Math.max(45,Math.min(W-45,this.x));
+        } else {
+          if (!this.atkHit&&this.st>=6) {
+            this.atkHit=true;
+            spawnHit(opp.x,opp.y-60,true); spawnHit(opp.x,opp.y-25,true);
+            for(let k=0;k<3;k++) setTimeout(()=>beep(200+k*180,'sawtooth',0.16,0.42),k*55);
+            if (Math.abs(opp.x-this.x)<160) opp.takeHit({dmg:42,stun:52,push:44,type:'special',knockdown:true}, this.dir);
+          }
+          if (this.st>=34){this.state='idle';this.st=0;this.superPhase=0;}
+        }
+      } else if (id==='rengoku') {
+        // 奥義 煉獄: 相手を止めて炎を纏い斬る
+        if (this.superPhase===0&&this.st===1){ opp.frozenFrames=Math.max(opp.frozenFrames,80); beep(200,'sawtooth',0.2,0.5); this.superPhase=1; }
+        if (this.superPhase===1) {
+          this.dir=opp.x>this.x?1:-1;
+          const tx=Math.max(45,Math.min(W-45, opp.x - this.dir*55));
+          const dx=tx-this.x;
+          if (Math.abs(dx)>14) this.x+=Math.sign(dx)*16;
+          if (this.st>=26&&!this.superFired) {
+            this.superFired=true;
+            spawnHit(opp.x,opp.y-60,true); spawnHit(opp.x,opp.y-30,true); spawnHit(opp.x,opp.y-90,true);
+            for(let k=0;k<3;k++) setTimeout(()=>beep(320-k*70,'sawtooth',0.18,0.42),k*70);
+            if (Math.abs(opp.x-this.x)<170) opp.takeHit({dmg:40,stun:50,push:42,type:'special',knockdown:true}, this.dir);
+          }
+          if (this.st>=52){this.state='idle';this.st=0;this.superPhase=0;}
+        }
+      } else if (id==='tanjiro') {
+        // 火車: ゆっくり飛びかかって斬り→10秒燃焼
+        if (this.superPhase===0) {
+          this.dir=opp.x>this.x?1:-1;
+          const tx=Math.max(45,Math.min(W-45, opp.x - this.dir*44));
+          const dx=tx-this.x;
+          this.x+=Math.sign(dx)*Math.min(Math.abs(dx),5);
+          this.y=GROUND - Math.sin(Math.min(1,this.st/34)*Math.PI)*95;
+          if ((Math.abs(dx)<=5 && this.st>=18) || this.st>=70) {
+            this.x=tx; this.y=GROUND; this.onGround=true; this.superPhase=1; this.st=0; this.atkHit=false;
+          }
+        } else {
+          if (!this.atkHit) {
+            this.atkHit=true;
+            spawnHit(opp.x,opp.y-60,true); spawnHit(opp.x,opp.y-30,true);
+            for(let k=0;k<2;k++) setTimeout(()=>beep(300-k*80,'sawtooth',0.16,0.4),k*70);
+            if (Math.abs(opp.x-this.x)<150) { opp.takeHit({dmg:22,stun:28,push:22,type:'special'}, this.dir); opp.burnFrames=600; }
+          }
+          if (this.st>=30){this.state='idle';this.st=0;this.superPhase=0;}
+        }
+      } else if (id==='akaza') {
+        // スーパーパンチ: 相手を止めて10連打
+        if (this.superPhase===0) {
+          this.dir=opp.x>this.x?1:-1;
+          opp.frozenFrames=Math.max(opp.frozenFrames,140);
+          this.x=Math.max(45,Math.min(W-45, opp.x - this.dir*42));
+          this.superHitActive=0; this.superPhase=1; beep(120,'square',0.18,0.4);
+        } else {
+          opp.frozenFrames=Math.max(opp.frozenFrames,10);
+          if (this.st%6===0 && this.superHitActive<10) {
+            this.superHitActive++;
+            const last=this.superHitActive>=10;
+            spawnHit(opp.x,opp.y-55,last);
+            beep(280+this.superHitActive*25,'square',0.06,0.2);
+            opp.hitStun=0; opp.invincFrames=0;
+            opp.takeHit({dmg:last?18:6, stun:8, push:last?46:0, type:'special', knockdown:last}, this.dir);
+          }
+          if (this.superHitActive>=10 && this.st>=72){this.state='idle';this.st=0;this.superPhase=0;}
+        }
+      } else if (id==='icchi') {
+        // 隕石: ランダムな場所に小隕石を10個落とす
+        if (this.st>0 && this.st<=90 && this.st%9===0) spawnMeteor(this, 60+gameRand()*(W-120));
+        if (this.st>=120){this.state='idle';this.st=0;}
+      } else if (id==='otousan') {
+        // 水の玉: 20秒追尾→当たると5秒閉じ込め
+        if (this.st===8 && !this.superFired){ this.superFired=true; spawnWaterBall(this); }
+        if (this.st>=30){this.state='idle';this.st=0;}
       } else {
-        // icchi, otousan: エンティティ召喚
+        // (未使用) エンティティ召喚
         if (!this.superFired&&this.st===1){
           this.superFired=true;
           if (id==='icchi') activeDragon=new IceDragon(this,opp);
@@ -2380,6 +2829,41 @@ class Fighter {
           }
         }
         if (this.st>=98){this.state='idle';this.st=0;}
+      } else if (id==='zenitsu') {
+        // 霹靂一閃: 前方へ瞬間移動して斬る。止まったらダメージ
+        if (this.superPhase===0) {
+          const step=32, dx=this.zTargetX-this.x;
+          if (Math.abs(dx)<=step) {
+            this.x=this.zTargetX; this.superPhase=1; this.st=0;
+            if (!this.atkHit&&Math.abs(opp.x-this.x)<115) {
+              this.atkHit=true;
+              if (opp.takeHit({dmg:18,stun:28,push:32,type:'special'}, this.dir)) spawnHit(opp.x,opp.y-60,true);
+              beep(900,'sawtooth',0.1,0.32); setTimeout(()=>beep(1500,'square',0.08,0.25),40);
+            }
+          } else this.x+=Math.sign(dx)*step;
+          this.x=Math.max(45,Math.min(W-45,this.x));
+        } else {
+          if (this.st>=10){this.state='idle';this.st=0;this.superPhase=0;}
+        }
+      } else if (id==='rengoku') {
+        // 炎の呼吸 伍ノ型 炎虎: 炎の虎が突進
+        if (this.st===6&&!this.specialFired){ this.specialFired=true; spawnFlameTiger(this,opp); }
+        if (this.st>=40){this.state='idle';this.st=0;}
+      } else if (id==='tanjiro') {
+        // 円舞: 周囲に炎を回し、近づいた相手にダメージ
+        if (this.st===1) beep(300,'sawtooth',0.14,0.4);
+        if (this.st>0&&this.st<=96 && Math.abs(opp.x-this.x)<88 && this.st%12===0) {
+          if (opp.takeHit({dmg:7,stun:12,push:16,type:'special'}, opp.x>=this.x?1:-1)) { spawnHit(opp.x,opp.y-50); beep(440,'sawtooth',0.06,0.15); }
+        }
+        if (this.st>=100){this.state='idle';this.st=0;}
+      } else if (id==='akaza') {
+        // 破壊殺・羅針: パンチ/速度/ジャンプ 強化（約7秒）
+        if (this.st===1){ this.buffFrames=420; beep(150,'square',0.2,0.4); setTimeout(()=>beep(300,'square',0.14,0.3),90); }
+        if (this.st>=24){this.state='idle';this.st=0;}
+      } else if (id==='otousan') {
+        // 津波: 水の杖から津波を出す
+        if (this.st===12) spawnTsunami(this);
+        if (this.st>=54){this.state='idle';this.st=0;}
       } else {
         const fireFrame={'icchi':9,'soyo':8,'otousan':15,'okaasan':10}[id]??9;
         const endFrame={'icchi':26,'soyo':28,'otousan':60,'okaasan':30}[id]??26;
@@ -2429,6 +2913,10 @@ class Fighter {
         else if (this.def.id==='soyo'){this.superPhase=0;this.superTargetX=this.dir>0?W-55:55;this.superOriginX=this.dir>0?55:W-55;this.superHitActive=0;this.atkHit=false;}
         else if (this.def.id==='kuppa'){this.superPhase=0;this.superHitActive=0;}
         else if (this.def.id==='luigi'||this.def.id==='kirby'){this.superPhase=0;}
+        else if (this.def.id==='zenitsu'){this.superPhase=0;this.atkHit=false;this.dir=opp.x>this.x?1:-1;}
+        else if (this.def.id==='rengoku'){this.superPhase=0;this.superFired=false;this.dir=opp.x>this.x?1:-1;}
+        else if (this.def.id==='tanjiro'){this.superPhase=0;this.atkHit=false;this.dir=opp.x>this.x?1:-1;}
+        else if (this.def.id==='akaza'){this.superPhase=0;this.superHitActive=0;this.dir=opp.x>this.x?1:-1;}
         triggerSuperFlash(this.def, this.x, this.y);
       } else {
         // 通常必殺技（ゲージ1/2消費）
@@ -2437,6 +2925,7 @@ class Fighter {
         if (this.def.id==='yuuri'){this.specialVx=this.dir*14;this.vy=-8;this.onGround=false;}
         else if (this.def.id==='kuppa'){this.superPhase=0;this.vy=-20;this.onGround=false;}
         else if (this.def.id==='luigi'){this.superPhase=0;}
+        else if (this.def.id==='zenitsu'){this.superPhase=0;this.atkHit=false;this.dir=opp.x>this.x?1:-1;this.zTargetX=Math.max(45,Math.min(W-45, opp.x - this.dir*55));}
         triggerSpecialFlash(this.def);
       }
       return;
@@ -2448,13 +2937,13 @@ class Fighter {
     else if (ok&&inp.punch&&!this.onGround){this.state='jatk';this.st=0;this.atkHit=false;beep(400,'triangle',0.06,0.09);}
     else if (ok&&inp.kick&&!this.onGround&&this.state!=='jkick'){this.state='jkick';this.st=0;this.atkHit=false;beep(120,'square',0.1,0.13);}
     else if (ok&&inp.up&&this.onGround){
-      this.vy=this.def.jumpVel;this.onGround=false;this.state='jump';this.st=0;
-      this.airVx=inp.right?this.def.walkSpd*1.4:inp.left?-this.def.walkSpd*1.4:0;
+      this.vy=this.def.jumpVel*(this.buffFrames>0?1.18:1);this.onGround=false;this.state='jump';this.st=0;
+      this.airVx=(inp.right?this.def.walkSpd*1.4:inp.left?-this.def.walkSpd*1.4:0)*(this.buffFrames>0?1.4:1);
       beep(440,'sine',0.1,0.12);
     }
     else if (inp.down&&this.onGround){this.state='crouch';}
-    else if (inp.left&&this.onGround){this.x-=this.def.walkSpd;this.state='walk';this.comboCount=0;}
-    else if (inp.right&&this.onGround){this.x+=this.def.walkSpd;this.state='walk';this.comboCount=0;}
+    else if (inp.left&&this.onGround){this.x-=this.def.walkSpd*(this.buffFrames>0?1.4:1);this.state='walk';this.comboCount=0;}
+    else if (inp.right&&this.onGround){this.x+=this.def.walkSpd*(this.buffFrames>0?1.4:1);this.state='walk';this.comboCount=0;}
     else if (this.onGround&&this.state!=='block'){this.state='idle';this.comboCount=0;}
 
     this.x=Math.max(55,Math.min(W-55,this.x));
@@ -2519,18 +3008,25 @@ class Fighter {
       this._shape(); ctx.restore(); return;
     }
     if (this.state==='super'&&this.def.id==='icchi') {
-      const s=this.def.scale, pulse=0.45+0.35*Math.sin(Date.now()/90);
-      ctx.save(); ctx.globalAlpha=pulse*0.55; ctx.fillStyle='#00ccff';
-      ctx.shadowBlur=45; ctx.shadowColor='#0088ff';
-      ctx.beginPath(); ctx.arc(this.x,this.y-70*s,65*s,0,Math.PI*2); ctx.fill();
+      const s=this.def.scale;
+      // 赤い空＋振り上げオーラ（隕石発動中）
+      ctx.save(); ctx.globalAlpha=0.12+0.06*Math.sin(Date.now()/120); ctx.fillStyle='#ff3300';
+      ctx.fillRect(0,0,W,GROUND); ctx.globalAlpha=1; ctx.restore();
+      ctx.save(); ctx.globalAlpha=0.4+0.3*Math.sin(Date.now()/60); ctx.fillStyle='#ff8800';
+      ctx.shadowBlur=30; ctx.shadowColor='#ffaa00';
+      ctx.beginPath(); ctx.arc(this.x,this.y-70*s,45*s,0,Math.PI*2); ctx.fill();
       ctx.globalAlpha=1; ctx.shadowBlur=0; ctx.restore();
+      ctx.fillStyle='#ffcc33'; ctx.font='bold 11px sans-serif'; ctx.textAlign='center';
+      ctx.fillText('☄隕石！',this.x,this.y-(150*s));
     }
     if (this.state==='super'&&this.def.id==='otousan') {
-      const r=18+14*Math.sin(Date.now()/75);
-      ctx.save(); ctx.globalAlpha=0.6; ctx.fillStyle='#330044';
-      ctx.shadowBlur=30; ctx.shadowColor='#8800cc';
-      ctx.beginPath(); ctx.arc(this.x,this.y-60*this.def.scale,r,0,Math.PI*2); ctx.fill();
+      const s=this.def.scale, pulse=0.5+0.35*Math.sin(Date.now()/70);
+      ctx.save(); ctx.globalAlpha=pulse*0.5; ctx.fillStyle='#2a7fff';
+      ctx.shadowBlur=35; ctx.shadowColor='#66bbff';
+      ctx.beginPath(); ctx.arc(this.x,this.y-65*s,52*s,0,Math.PI*2); ctx.fill();
       ctx.globalAlpha=1; ctx.shadowBlur=0; ctx.restore();
+      ctx.fillStyle='#aad4ff'; ctx.font='bold 11px sans-serif'; ctx.textAlign='center';
+      ctx.fillText('💧水の玉！',this.x,this.y-(150*s));
     }
     if (this.state==='super'&&this.def.id==='okaasan') {
       const s=this.def.scale, pulse=0.4+0.3*Math.sin(Date.now()/80);
@@ -2632,6 +3128,51 @@ class Fighter {
       ctx.globalAlpha=pulse*0.28; ctx.fillStyle='#ffffff';
       ctx.beginPath(); ctx.arc(this.x,this.y-65*s,38*s,0,Math.PI*2); ctx.fill();
       ctx.globalAlpha=1; ctx.shadowBlur=0; ctx.restore();
+    }
+    if (this.state==='super'&&this.def.id==='zenitsu') {
+      // 火雷神: 黄金の雷オーラ＋稲妻
+      const s=this.def.scale, now=Date.now();
+      ctx.save(); ctx.globalAlpha=0.45+0.4*Math.sin(now/40); ctx.fillStyle='#ffdd00';
+      ctx.shadowBlur=45; ctx.shadowColor='#fff0a0';
+      ctx.beginPath(); ctx.arc(this.x,this.y-65*s,60*s,0,Math.PI*2); ctx.fill();
+      ctx.globalAlpha=1; ctx.shadowBlur=0;
+      ctx.strokeStyle='#fff7c0'; ctx.lineWidth=3;
+      for (let i=0;i<6;i++){ const a=now/60+i/6*Math.PI*2; ctx.globalAlpha=0.6+0.4*Math.sin(now/50+i);
+        let px=this.x, py=this.y-65*s; ctx.beginPath(); ctx.moveTo(px,py);
+        for(let j=1;j<=4;j++){ px+=Math.cos(a)*16*s+(Math.random()-0.5)*10; py+=Math.sin(a)*16*s+(Math.random()-0.5)*10; ctx.lineTo(px,py);} ctx.stroke(); }
+      ctx.globalAlpha=1; ctx.restore();
+    }
+    if (this.state==='super'&&this.def.id==='rengoku') {
+      // 奥義 煉獄: 紅蓮の炎オーラ
+      const s=this.def.scale, pulse=0.5+0.4*Math.sin(Date.now()/55);
+      ctx.save(); ctx.globalAlpha=pulse*0.55; ctx.fillStyle='#ff3300';
+      ctx.shadowBlur=48; ctx.shadowColor='#ffaa00';
+      ctx.beginPath(); ctx.arc(this.x,this.y-62*s,64*s,0,Math.PI*2); ctx.fill();
+      ctx.globalAlpha=pulse*0.4; ctx.fillStyle='#ffdd00';
+      for (let i=0;i<7;i++){ const a=Date.now()/90+i/7*Math.PI*2, r=44*s;
+        ctx.beginPath(); ctx.moveTo(this.x+Math.cos(a)*r, this.y-62*s+Math.sin(a)*r);
+        ctx.lineTo(this.x+Math.cos(a)*(r+24*s), this.y-62*s+Math.sin(a)*(r+24*s)-14); ctx.lineTo(this.x+Math.cos(a+0.2)*r, this.y-62*s+Math.sin(a+0.2)*r); ctx.closePath(); ctx.fill(); }
+      ctx.globalAlpha=1; ctx.shadowBlur=0; ctx.restore();
+      ctx.fillStyle='#ffcc33'; ctx.font='bold 11px sans-serif'; ctx.textAlign='center';
+      ctx.fillText('🔥奥義 煉獄！',this.x,this.y-(150*s));
+    }
+    if (this.state==='super'&&this.def.id==='tanjiro') {
+      const s=this.def.scale;
+      ctx.save(); ctx.globalAlpha=0.7;
+      for(let i=0;i<8;i++){ const a=Date.now()/40+i/8*Math.PI*2; ctx.fillStyle=i%2?'#ff5500':'#ffcc00';
+        ctx.beginPath(); ctx.arc(this.x+Math.cos(a)*30*s, this.y-55*s+Math.sin(a)*30*s, 6*s,0,Math.PI*2); ctx.fill(); }
+      ctx.globalAlpha=1; ctx.restore();
+      ctx.fillStyle='#ff8833'; ctx.font='bold 11px sans-serif'; ctx.textAlign='center';
+      ctx.fillText('🔥火車！',this.x,this.y-(150*s));
+    }
+    if (this.state==='super'&&this.def.id==='akaza') {
+      const s=this.def.scale;
+      ctx.save(); ctx.globalAlpha=0.5+0.4*Math.sin(Date.now()/30); ctx.fillStyle='#ff4488';
+      ctx.shadowBlur=30; ctx.shadowColor='#ff88bb';
+      ctx.beginPath(); ctx.arc(this.x,this.y-58*s,50*s,0,Math.PI*2); ctx.fill();
+      ctx.globalAlpha=1; ctx.shadowBlur=0; ctx.restore();
+      ctx.fillStyle='#ff99cc'; ctx.font='bold 12px sans-serif'; ctx.textAlign='center';
+      ctx.fillText('パンチ '+(this.superHitActive||0)+'/10',this.x,this.y-(150*s));
     }
     // ビッグライト有効中: 大きくなっているエフェクト
     if (this.bigLightT>0) {
@@ -2752,6 +3293,66 @@ class Fighter {
         ctx.beginPath(); ctx.arc(this.x+Math.cos(ang)*r,this.y-65*s+Math.sin(ang)*r*0.5,5*s,0,Math.PI*2); ctx.fill();
       }
       ctx.shadowBlur=0; ctx.globalAlpha=1; ctx.restore();
+    }
+    if (this.state==='special'&&this.def.id==='zenitsu') {
+      // 霹靂一閃: 黄色い残像＋稲妻
+      const s=this.def.scale;
+      ctx.save();
+      for (let i=1;i<=5;i++){ ctx.globalAlpha=0.45-i*0.07; ctx.fillStyle='#ffee44';
+        ctx.beginPath(); ctx.ellipse(this.x-this.dir*i*16, this.y-60*s, 10*s, 40*s, 0, 0, Math.PI*2); ctx.fill(); }
+      ctx.globalAlpha=0.85; ctx.strokeStyle='#fff7c0'; ctx.lineWidth=3;
+      let px=this.x-this.dir*80, py=this.y-60*s;
+      ctx.beginPath(); ctx.moveTo(px,py);
+      for(let j=0;j<6;j++){ px+=this.dir*16+(Math.random()-0.5)*6; py+=(Math.random()-0.5)*22; ctx.lineTo(px,py);} ctx.stroke();
+      ctx.globalAlpha=1; ctx.restore();
+    }
+    if (this.state==='special'&&this.def.id==='rengoku') {
+      // 炎虎: 赤い炎オーラ
+      const s=this.def.scale, prog=Math.min(1,this.st/8);
+      ctx.save(); ctx.globalAlpha=prog*0.4; ctx.fillStyle='#ff4400';
+      ctx.shadowBlur=22; ctx.shadowColor='#ffaa00';
+      ctx.beginPath(); ctx.arc(this.x,this.y-58*s,44*s*prog,0,Math.PI*2); ctx.fill();
+      ctx.globalAlpha=1; ctx.shadowBlur=0; ctx.restore();
+    }
+    if (this.state==='special'&&this.def.id==='tanjiro') {
+      const s=this.def.scale;
+      ctx.save();
+      for(let i=0;i<10;i++){ const a=Date.now()/50+i/10*Math.PI*2, r=(46+Math.sin(Date.now()/120+i)*6)*s;
+        ctx.globalAlpha=0.7; ctx.fillStyle=i%2?'#ff5500':'#ffbb00';
+        ctx.beginPath(); ctx.arc(this.x+Math.cos(a)*r, this.y-55*s+Math.sin(a)*r*0.6, 5*s,0,Math.PI*2); ctx.fill(); }
+      ctx.globalAlpha=1; ctx.restore();
+    }
+    if (this.state==='special'&&this.def.id==='akaza') {
+      const s=this.def.scale, prog=Math.min(1,this.st/10);
+      ctx.save(); ctx.globalAlpha=prog*0.4; ctx.fillStyle='#66ccff';
+      ctx.shadowBlur=20; ctx.shadowColor='#aaddff';
+      ctx.beginPath(); ctx.arc(this.x,this.y-58*s,42*s*prog,0,Math.PI*2); ctx.fill();
+      ctx.globalAlpha=1; ctx.shadowBlur=0; ctx.restore();
+    }
+    // 強化(羅針)・燃焼(火車) の継続表示
+    if (this.buffFrames>0) {
+      const s=this.def.scale;
+      ctx.save(); ctx.globalAlpha=0.3+0.2*Math.sin(Date.now()/120); ctx.strokeStyle='#66ccff'; ctx.lineWidth=3;
+      ctx.beginPath(); ctx.arc(this.x,this.y-58*s,46*s,0,Math.PI*2); ctx.stroke(); ctx.globalAlpha=1; ctx.restore();
+      ctx.fillStyle='#88ddff'; ctx.font='bold 10px sans-serif'; ctx.textAlign='center';
+      ctx.fillText('💪強化('+Math.ceil(this.buffFrames/60)+'s)',this.x,this.y-(162*s));
+    }
+    if (this.burnFrames>0) {
+      const s=this.def.scale;
+      ctx.save(); ctx.globalAlpha=0.4+0.3*Math.sin(Date.now()/70); ctx.fillStyle='#ff5500';
+      for(let i=0;i<4;i++){ ctx.beginPath(); ctx.arc(this.x-16+i*11, this.y-40-Math.abs(Math.sin(Date.now()/90+i))*20*s, 4*s,0,Math.PI*2); ctx.fill(); }
+      ctx.globalAlpha=1; ctx.restore();
+      ctx.fillStyle='#ff7700'; ctx.font='bold 10px sans-serif'; ctx.textAlign='center';
+      ctx.fillText('🔥燃焼('+Math.ceil(this.burnFrames/60)+'s)',this.x,this.y-(150*s));
+    }
+    if (this.trapFrames>0) {
+      const sc=this.def.scale;
+      ctx.save(); ctx.globalAlpha=0.32; ctx.fillStyle='#3399ff';
+      ctx.beginPath(); ctx.arc(this.x,this.y-40*sc,34*sc,0,Math.PI*2); ctx.fill();
+      ctx.globalAlpha=0.8; ctx.strokeStyle='#aad4ff'; ctx.lineWidth=2; ctx.stroke();
+      ctx.globalAlpha=1; ctx.restore();
+      ctx.fillStyle='#aad4ff'; ctx.font='bold 10px sans-serif'; ctx.textAlign='center';
+      ctx.fillText('💧閉じ込め('+Math.ceil(this.trapFrames/60)+'s)',this.x,this.y-(150*sc));
     }
     // Freeze effect
     if (this.frozenFrames>0) {
@@ -3057,7 +3658,7 @@ class Fighter {
       ctx.fillStyle='#FFCC99';
       ctx.beginPath(); ctx.arc(bw/2-6,aY-26,lw*0.8,0,Math.PI*2); ctx.fill();
       ctx.beginPath(); ctx.arc(bw/2-2,aY-24,lw*0.8,0,Math.PI*2); ctx.fill();
-    } else if (isSpecial&&(def.id==='icchi'||def.id==='soyo'||def.id==='okaasan'||def.id==='otousan'||def.id==='kuppa'||def.id==='kinopio'||def.id==='mario'||def.id==='luigi'||def.id==='pikachu'||def.id==='doraemon'||def.id==='jogo'||def.id==='gojo')) {
+    } else if (isSpecial&&(def.id==='icchi'||def.id==='soyo'||def.id==='okaasan'||def.id==='otousan'||def.id==='kuppa'||def.id==='kinopio'||def.id==='mario'||def.id==='luigi'||def.id==='pikachu'||def.id==='doraemon'||def.id==='jogo'||def.id==='gojo'||def.id==='zenitsu'||def.id==='rengoku'||def.id==='tanjiro'||def.id==='akaza')) {
       const raise=chargeRaise*28;
       ctx.beginPath(); ctx.moveTo(bw/2-4,aY); ctx.lineTo(bw/2+18,aY-21-raise); ctx.stroke();
       ctx.beginPath(); ctx.moveTo(-bw/2+4,aY); ctx.lineTo(-bw/2-18,aY-21-raise); ctx.stroke();
@@ -3285,6 +3886,57 @@ class Fighter {
       // 目隠しのハイライト
       ctx.fillStyle='rgba(100,100,150,0.2)';
       ctx.fillRect(-14,hy-8,28,3);
+    } else if (hs==='zenitsu') {
+      // 善逸: 金髪、前に流れる毛＋ツンとした毛先
+      ctx.fillStyle='#ffd633';
+      ctx.beginPath(); ctx.arc(0,hy-8,14,Math.PI,0); ctx.fill();
+      ctx.fillRect(-14,hy-8,28,10);
+      // 前髪のトゲ
+      ctx.beginPath(); ctx.moveTo(-14,hy-6); ctx.lineTo(-20,hy-20); ctx.lineTo(-6,hy-12); ctx.closePath(); ctx.fill();
+      ctx.beginPath(); ctx.moveTo(-4,hy-12); ctx.lineTo(0,hy-26); ctx.lineTo(6,hy-12); ctx.closePath(); ctx.fill();
+      ctx.beginPath(); ctx.moveTo(8,hy-10); ctx.lineTo(18,hy-22); ctx.lineTo(14,hy-6); ctx.closePath(); ctx.fill();
+      // 毛先のオレンジ
+      ctx.fillStyle='#ff9900';
+      ctx.beginPath(); ctx.moveTo(-20,hy-20); ctx.lineTo(-15,hy-15); ctx.lineTo(-10,hy-16); ctx.closePath(); ctx.fill();
+      ctx.beginPath(); ctx.moveTo(0,hy-26); ctx.lineTo(3,hy-18); ctx.lineTo(-3,hy-18); ctx.closePath(); ctx.fill();
+    } else if (hs==='rengoku') {
+      // 煉獄: 紅蓮の炎のような髪（赤ベース＋黄色い炎先）
+      ctx.fillStyle='#cc1100';
+      ctx.beginPath(); ctx.arc(0,hy-8,15,Math.PI,0); ctx.fill();
+      ctx.fillRect(-15,hy-8,30,10);
+      // 上に伸びる炎の房（赤）
+      [[-12,-26],[-4,-34],[5,-30],[13,-24]].forEach(([bx,by])=>{
+        ctx.fillStyle='#dd2200';
+        ctx.beginPath(); ctx.moveTo(bx-7,hy-6); ctx.quadraticCurveTo(bx,hy+by-6,bx,hy+by); ctx.quadraticCurveTo(bx,hy+by-6,bx+7,hy-6); ctx.closePath(); ctx.fill();
+        ctx.fillStyle='#ffcc00';
+        ctx.beginPath(); ctx.moveTo(bx-3,hy+by+8); ctx.quadraticCurveTo(bx,hy+by-2,bx,hy+by); ctx.quadraticCurveTo(bx,hy+by-2,bx+3,hy+by+8); ctx.closePath(); ctx.fill();
+      });
+      // 前髪の黄色いメッシュ
+      ctx.fillStyle='#ffdd33';
+      ctx.beginPath(); ctx.moveTo(-3,hy-8); ctx.lineTo(0,hy-22); ctx.lineTo(3,hy-8); ctx.closePath(); ctx.fill();
+    } else if (hs==='tanjiro') {
+      // 炭治郎: 黒髪、毛先が赤み、額に傷
+      ctx.fillStyle='#20242c';
+      ctx.beginPath(); ctx.arc(0,hy-9,14,Math.PI,0); ctx.fill();
+      ctx.fillRect(-14,hy-9,28,10);
+      ctx.beginPath(); ctx.moveTo(-13,hy-7); ctx.lineTo(-16,hy-20); ctx.lineTo(-6,hy-11); ctx.closePath(); ctx.fill();
+      ctx.beginPath(); ctx.moveTo(-3,hy-11); ctx.lineTo(-1,hy-23); ctx.lineTo(6,hy-11); ctx.closePath(); ctx.fill();
+      ctx.beginPath(); ctx.moveTo(8,hy-9); ctx.lineTo(15,hy-19); ctx.lineTo(14,hy-7); ctx.closePath(); ctx.fill();
+      ctx.fillStyle='#8a1c1c';
+      ctx.beginPath(); ctx.moveTo(-16,hy-20); ctx.lineTo(-11,hy-14); ctx.lineTo(-9,hy-15); ctx.closePath(); ctx.fill();
+      ctx.beginPath(); ctx.moveTo(-1,hy-23); ctx.lineTo(2,hy-15); ctx.lineTo(-4,hy-15); ctx.closePath(); ctx.fill();
+      // 額の傷
+      ctx.strokeStyle='#a83a2a'; ctx.lineWidth=1.6;
+      ctx.beginPath(); ctx.moveTo(-8,hy-6); ctx.lineTo(-4,hy-2); ctx.moveTo(-6,hy-5); ctx.lineTo(-9,hy-1); ctx.stroke();
+    } else if (hs==='akaza') {
+      // 猗窩座: ピンクの短髪＋トゲ、青い刺青
+      ctx.fillStyle='#e0619a';
+      ctx.beginPath(); ctx.arc(0,hy-8,14,Math.PI,0); ctx.fill();
+      ctx.fillRect(-14,hy-8,28,9);
+      [[-11,-22],[-2,-26],[7,-22],[13,-16]].forEach(([bx,by])=>{
+        ctx.beginPath(); ctx.moveTo(bx-5,hy-6); ctx.lineTo(bx,hy+by); ctx.lineTo(bx+5,hy-6); ctx.closePath(); ctx.fill(); });
+      ctx.strokeStyle='#3a7bd5'; ctx.lineWidth=1.6;
+      ctx.beginPath(); ctx.moveTo(-10,hy+2); ctx.lineTo(-4,hy+6); ctx.moveTo(10,hy+2); ctx.lineTo(4,hy+6); ctx.stroke();
     } else {
       ctx.fillStyle=hc; ctx.beginPath(); ctx.arc(0,hy-10,13,Math.PI,0); ctx.fill();
       ctx.fillStyle=c2; ctx.fillRect(-18,hy-7,36,6);
@@ -3730,7 +4382,7 @@ function drawCharSelect() {
   ctx.fillText(IS_TOUCH ? 'タップして選択 / 決定で確定' : '← → で選択　　Space / Enter で決定',W/2,62);
   drawBackBtn();
 
-  const CS_COLS=7, PW=108, PH=185, GAP=5, startX=5, startY=68;
+  const CS_COLS=9, PW=84, PH=185, GAP=4, startX=6, startY=68;
   CHAR_LIST.forEach((def,idx)=>{
     const col=idx%CS_COLS, row=Math.floor(idx/CS_COLS);
     const px=startX+col*(PW+GAP), py=startY+row*(PH+GAP);
@@ -3930,12 +4582,13 @@ function startRound() {
   monsterBall=null; mbBallTimer=60*15; mbSummons.length=0; mbLightningBolts.length=0; mbBanner=null;
   masterBall=null; mballTimer=60*20; mballPower=null;
   pencils.length=0; pencilSpawnTimer=0;
+  initSchoolStage();
   timerSec=99; timerTick=0; koGrace=0;
 }
 
 function spawnSpecialEffect(owner, target) {
   switch(owner.def.id) {
-    case 'icchi': spawnDragonSword(owner); break;
+    case 'icchi': spawnFireTornado(owner); break;
     case 'soyo':  activateHurdles(owner,target); break;
     case 'otousan': activateWordAttack(owner); break;
     case 'okaasan':
@@ -4115,6 +4768,7 @@ function loop(ts) {
     updateMonsterBall(p1,p2); updateMBSummons(p1,p2); updateMBLightningBolts(p1,p2);
     updateMasterBall(p1,p2); if(mballPower) updateMasterBallPower(p1,p2,i1,i2);
     if (selectedStage===1) updatePencils(p1,p2);
+    if (selectedStage===2) updateSchool(p1,p2);
 
     const p1ko=p1.hp<=0,p2ko=p2.hp<=0,timeout=timerSec<=0;
     if (p1ko||p2ko||timeout) {
@@ -4184,6 +4838,7 @@ function loop(ts) {
   drawMBSummons(); drawMBLightningBolts(); drawMonsterBall(); drawMBBanner();
   drawMasterBall(); drawMasterBallPower();
   if (selectedStage===1) drawPencils();
+  if (selectedStage===2) drawSchool();
   drawWords();
   drawEffects();
   drawResultPose();
