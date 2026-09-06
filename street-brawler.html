@@ -1747,6 +1747,32 @@ let screenFlash = {t:0, color:'#fff'};
 let specialBanner = {name:'', color:'#fff', t:0};
 let superFlash = {t:0, color:'#fff', ox:400, oy:225};
 
+// ---- 足元のダスト（着地・歩行の足音） ----
+const dustFx = [];
+function spawnDust(x,y,n=7,big=false) {
+  const out=[];
+  for (let i=0;i<n;i++){
+    const a=Math.PI+Math.random()*Math.PI; // 上半分方向へ広がる
+    const sp=(big?2.6:1.5)*(0.4+Math.random());
+    out.push({x:0,y:0,vx:Math.cos(a)*sp,vy:Math.sin(a)*sp*0.5-0.3,r:(big?4.5:2.6)*(0.6+Math.random())});
+  }
+  dustFx.push({x,y,t:big?22:14,maxT:big?22:14,parts:out});
+}
+function drawDust() {
+  for (let i=dustFx.length-1;i>=0;i--) {
+    const e=dustFx[i], a=e.t/e.maxT;
+    ctx.save();
+    ctx.fillStyle='rgba(200,185,160,0.55)';
+    e.parts.forEach(pt=>{
+      pt.x+=pt.vx; pt.y+=pt.vy; pt.vx*=0.94;
+      ctx.globalAlpha=a*0.6;
+      ctx.beginPath(); ctx.ellipse(e.x+pt.x,e.y+pt.y,pt.r*(1.4-a*0.4),pt.r*0.6,0,0,Math.PI*2); ctx.fill();
+    });
+    ctx.restore();
+    if (--e.t<=0) dustFx.splice(i,1);
+  }
+}
+
 function spawnHit(x,y,big=false) {
   effects.push({x,y,t:big?25:18,big,
     parts:(function(){
@@ -1759,6 +1785,7 @@ function spawnHit(x,y,big=false) {
       return out;
     })()});
   if (typeof GFX!=='undefined') { GFX.shake(big?7:3.2, big?12:7); GFX.punch(big?0.030:0.012); }
+  hitStopFrames = Math.max(hitStopFrames, big?9:4);
   beep(big?280:420+Math.random()*180,'square',big?0.2:0.12,big?0.7:0.5);
 }
 function drawEffects() {
@@ -3273,6 +3300,8 @@ class Fighter {
     this.punchFired=false; this.guardFlash=0; this.guardMode=false;
     this.comboCount=0; this.invincFrames=0;
     this.pose=null;
+    this.landSquashT=0; this._prevGrounded=true; this._fallVy=0; // 着地演出用
+    this._lastStepIdx=0; // 歩行の足音ダスト用
   }
   hurtbox() {
     const s=this.def.scale;
@@ -3382,7 +3411,10 @@ class Fighter {
   update(opp,inp) {
     if (this.state==='dead') return;
     this.st++;
-    if (++this.atick>=(this.def.id==='icchi'||this.def.id==='soyo'?5:9)){this.atick=0;this.af^=1;}
+    if (!this.onGround) this._fallVy=this.vy; // 着地演出用: 着地でvyが0に戻る直前の値を覚えておく
+    // 歩行の脚振り位相（距離に応じて連続的に進める。isFast系キャラは歩幅が速い）
+    if (this.state==='walk') { this.af += 0.30 * (this.def.id==='icchi'||this.def.id==='soyo'?1.6:1); }
+    else { this.af = 0; }
     if (this.hitStun>0) this.hitStun--;
     if (this.blockStun>0) this.blockStun--;
     if (this.guardFlash>0) this.guardFlash--;
@@ -3835,6 +3867,19 @@ class Fighter {
   }
 
   draw() {
+    // 着地検知（純粋に見た目だけの処理。判定・タイミングには影響しない）
+    if (this.landSquashT>0) this.landSquashT--;
+    if (this._prevGrounded===false && this.onGround===true && this.state!=='down' && this.state!=='downrise') {
+      const fv=this._fallVy||0;
+      this.landSquashT=8;
+      spawnDust(this.x, GROUND, fv>14?9:6, fv>14);
+    }
+    this._prevGrounded=this.onGround;
+    // 歩行中の足音ダスト（半周期ごと＝一歩ごとに小さく舞う）
+    if (this.state==='walk') {
+      const stepIdx=Math.floor(this.af/Math.PI);
+      if (stepIdx!==this._lastStepIdx) { this._lastStepIdx=stepIdx; spawnDust(this.x-this.dir*6, GROUND, 3); }
+    }
     // ダウン状態: 横に倒れる
     if (this.state==='down'||this.state==='downrise') {
       const blink=this.state==='downrise'&&Math.floor(this.st/4)%2===0;
@@ -4363,21 +4408,29 @@ class Fighter {
 
   _shape() {
     const ctx = GFX.target;   // GFX の合成バッファへ描く（通常時は本体 ctx と同じ）
+    // 着地スクワッシュ（着地直後だけ縦に潰れて横に伸び、数フレームで元に戻る）
+    let _sqx=1,_sqy=1;
+    if (this.landSquashT>0) {
+      const p=this.landSquashT/8;
+      _sqy=1-0.20*p; _sqx=1+0.13*p;
+    }
+    ctx.save(); ctx.scale(_sqx,_sqy);
     const s=this.state,def=this.def,c1=def.c1,c2=def.c2;
     const bw=def.bodyW,lw=def.limbW;
     const crouching=s==='crouch';
-    const swing=s==='walk'?Math.sin(this.af*Math.PI)*14:0;
+    const swing=s==='walk'?Math.sin(this.af)*16:0;
+    const bob=s==='walk'?Math.abs(Math.sin(this.af))*3.5:0; // 歩行時、着地のたびに体全体がわずかに沈む
     const punchOn=s==='punch'&&this.st>=def.punchS&&this.st<=def.punchE&&!def.punchIsProjectile;
     const jatkOn=s==='jatk'&&this.st>=def.jatkS&&this.st<=def.jatkE;
     const kickOn=(s==='kick'&&this.st>=def.kickS&&this.st<=def.kickE)||
                  (s==='jkick'&&this.st>=def.kickS&&this.st<=def.kickE);
     const isSpecial=s==='special';
     const chargeRaise=isSpecial?Math.min(1,this.st/10):0;
-    const bodyTop=crouching?-50:-84;
+    const bodyTop=(crouching?-50:-84)+bob;
     const bodyH  =crouching?28:48;
-    const beltY  =crouching?-30:-44;
+    const beltY  =(crouching?-30:-44)+bob;
     const aY     =bodyTop+10;
-    const headCY =crouching?-68:-106;
+    const headCY =(crouching?-68:-106)+bob;
     const footY  =crouching?-8:-18;
     GFX.bodyCY = bodyTop + bodyH/2;   // 四肢の付け根判定に使う
 
@@ -4597,8 +4650,7 @@ class Fighter {
       ctx.beginPath(); ctx.moveTo(-bw/2+4,aY); ctx.lineTo(-bw/2-12,aY+16-swing); ctx.stroke();
     }
 
-    const hbob=s==='walk'?Math.sin(this.af*Math.PI)*2:0;
-    const hy=headCY+hbob;
+    const hy=headCY; // headCYは既にbob込み
     const headR=def.id==='kirby'?22:18;
     if (def.id!=='kirby') {          // 首（頭と胴のつなぎ）
       ctx.fillStyle='#e8b184';
@@ -4941,6 +4993,7 @@ class Fighter {
       ctx.beginPath(); ctx.moveTo(1,hy-3); ctx.lineTo(-0,hy-3); ctx.stroke();
       ctx.beginPath(); ctx.moveTo(11,hy-3); ctx.lineTo(14,hy-2); ctx.stroke();
     }
+    ctx.restore();
   }
 
   _shapeDropkick() {
@@ -5359,6 +5412,7 @@ let p1,p2,cpuCtrl;
 let fighters=[];
 let timerSec=99, timerTick=0;
 let wins=[0,0], roundNum=1, koGrace=0;
+let hitStopFrames=0; // ヒット瞬間の「間」演出。>0の間は物理/入力更新を止め、直前の絵のまま止め絵にする
 let flash={msg:'',t:0};
 let endTimer=0, selectedCharIdx=0, cpuCharIdx=1, selectStep=0;
 let gameMode='cpu'; // 'cpu', '2p', or 'net'
@@ -5632,7 +5686,9 @@ function loop(ts) {
   drawBackground();
   drawScreenFlash();
 
-  if (phase==='fight') {
+  if (phase==='fight' && hitStopFrames>0) {
+    hitStopFrames--;
+  } else if (phase==='fight') {
     if (++timerTick>=60){timerTick=0;timerSec--;}
     const myInput={punch:keys['KeyJ'],kick:keys['KeyK'],left:keys['KeyA'],right:keys['KeyD'],
                    up:keys['KeyW'],down:keys['KeyS'],block:keys['KeyL'],special:keys['Space']};
@@ -5761,6 +5817,7 @@ function loop(ts) {
   if (selectedStage===2) drawSchool();
   drawWords();
   drawEffects();
+  drawDust();
   drawResultPose();
   GFX.camEnd();
   GFX.post();
