@@ -1668,36 +1668,76 @@ function updateSchool(p1,p2){
 
 // 背景（教室）——drawBackgroundから呼ばれる
 function drawStageSchool(){
-  ctx.fillStyle='#cfe3ec'; ctx.fillRect(0,0,W,GROUND);
-  ctx.fillStyle='#e7eef2'; ctx.fillRect(0,96,W,GROUND-96);
+  const wall=ctx.createLinearGradient(0,0,0,96);
+  wall.addColorStop(0,'#a9c6d4'); wall.addColorStop(1,'#cfe3ec');
+  ctx.fillStyle=wall; ctx.fillRect(0,0,W,96);
+  const wallLo=ctx.createLinearGradient(0,96,0,GROUND);
+  wallLo.addColorStop(0,'#e7eef2'); wallLo.addColorStop(1,'#f3f2e8');
+  ctx.fillStyle=wallLo; ctx.fillRect(0,96,W,GROUND-96);
+  ctx.fillStyle='rgba(60,70,60,0.10)'; ctx.fillRect(0,96,W,5); // 腰壁の境目
   // 窓（右）
-  ctx.fillStyle='#bfe6f7'; ctx.fillRect(566,54,196,132);
-  ctx.fillStyle='rgba(255,255,255,0.35)'; ctx.fillRect(566,54,196,40);
-  ctx.strokeStyle='#8fb4cc'; ctx.lineWidth=5; ctx.strokeRect(566,54,196,132);
-  ctx.lineWidth=3; ctx.beginPath(); ctx.moveTo(664,54); ctx.lineTo(664,186); ctx.moveTo(566,120); ctx.lineTo(762,120); ctx.stroke();
+  const wx=566,wy=54,ww=196,wh=132;
+  const sky=ctx.createLinearGradient(0,wy,0,wy+wh);
+  sky.addColorStop(0,'#8fd0f0'); sky.addColorStop(0.55,'#bfe6f7'); sky.addColorStop(1,'#e8f6ff');
+  ctx.fillStyle=sky; ctx.fillRect(wx,wy,ww,wh);
+  ctx.save(); ctx.globalCompositeOperation='lighter'; ctx.globalAlpha=0.16;
+  const beam=ctx.createLinearGradient(wx,wy,wx-160,GROUND);
+  beam.addColorStop(0,'rgba(255,255,255,1)'); beam.addColorStop(1,'rgba(255,255,255,0)');
+  ctx.fillStyle=beam;
+  ctx.beginPath(); ctx.moveTo(wx,wy); ctx.lineTo(wx+ww,wy);
+  ctx.lineTo(wx+ww-190,GROUND); ctx.lineTo(wx-160,GROUND); ctx.closePath(); ctx.fill();
+  ctx.restore();
+  const frame=ctx.createLinearGradient(wx-6,0,wx+ww+6,0);
+  frame.addColorStop(0,'#e6dcc2'); frame.addColorStop(0.5,'#c9a06a'); frame.addColorStop(1,'#a67c42');
+  ctx.strokeStyle=frame; ctx.lineWidth=6; ctx.strokeRect(wx,wy,ww,wh);
+  ctx.strokeStyle='rgba(255,255,255,0.5)'; ctx.lineWidth=2;
+  ctx.beginPath(); ctx.moveTo(wx+ww/2,wy); ctx.lineTo(wx+ww/2,wy+wh); ctx.moveTo(wx,wy+wh/2); ctx.lineTo(wx+ww,wy+wh/2); ctx.stroke();
   // 黒板（左〜中）
-  ctx.fillStyle='#2f5d3f'; ctx.fillRect(46,52,430,120);
-  ctx.strokeStyle='#c9a06a'; ctx.lineWidth=9; ctx.strokeRect(46,52,430,120);
-  ctx.fillStyle='rgba(255,255,255,0.75)'; ctx.font='22px sans-serif'; ctx.textAlign='left';
-  ctx.fillText('大乱闘ウエダ学級', 66, 96); ctx.font='16px sans-serif'; ctx.fillText('しずかに たたかいなさい', 66, 132);
-  ctx.fillStyle='#31473b'; ctx.fillRect(46,166,430,8);
-  ctx.fillStyle='#fff'; ctx.fillRect(120,168,20,4); ctx.fillStyle='#fdd'; ctx.fillRect(150,168,15,4);
+  const bx=46,by=52,bw=430,bh=120;
+  const board=ctx.createLinearGradient(bx,by,bx+bw*0.6,by+bh);
+  board.addColorStop(0,'#3a6c4a'); board.addColorStop(0.5,'#2b5138'); board.addColorStop(1,'#1f3c29');
+  ctx.fillStyle=board; ctx.fillRect(bx,by,bw,bh);
+  ctx.save(); ctx.globalAlpha=0.10; ctx.fillStyle='#fff';
+  ctx.beginPath(); ctx.ellipse(bx+bw*0.28,by+bh*0.26,bw*0.32,bh*0.30,-0.2,0,Math.PI*2); ctx.fill();
+  ctx.restore();
+  const bframe=ctx.createLinearGradient(0,by,0,by+bh);
+  bframe.addColorStop(0,'#dcb87e'); bframe.addColorStop(1,'#a67c42');
+  ctx.strokeStyle=bframe; ctx.lineWidth=9; ctx.strokeRect(bx,by,bw,bh);
+  ctx.fillStyle='rgba(255,255,255,0.78)'; ctx.font='22px sans-serif'; ctx.textAlign='left';
+  ctx.fillText('大乱闘ウエダ学級', bx+20, by+44); ctx.font='16px sans-serif'; ctx.fillText('しずかに たたかいなさい', bx+20, by+80);
+  const tray=ctx.createLinearGradient(0,by+bh+2,0,by+bh+10);
+  tray.addColorStop(0,'#4a5f4f'); tray.addColorStop(1,'#2a3a2e');
+  ctx.fillStyle=tray; ctx.fillRect(bx,by+bh+2,bw,8);
+  ctx.fillStyle='#fff'; ctx.fillRect(bx+74,by+bh+4,20,4); ctx.fillStyle='#fdd'; ctx.fillRect(bx+104,by+bh+4,15,4);
   // 床（フローリング）
-  ctx.fillStyle='#d8c19a'; ctx.fillRect(0,GROUND,W,H-GROUND);
+  const fl=ctx.createLinearGradient(0,GROUND,0,H);
+  fl.addColorStop(0,'#e2cd9e'); fl.addColorStop(1,'#b89a68');
+  ctx.fillStyle=fl; ctx.fillRect(0,GROUND,W,H-GROUND);
   ctx.fillStyle='#c8ad82'; ctx.fillRect(0,GROUND,W,4);
-  ctx.strokeStyle='#b89a6a'; ctx.lineWidth=1.1;
+  ctx.strokeStyle='rgba(140,110,60,0.35)'; ctx.lineWidth=1.1;
   for(let x=0;x<=W;x+=64){ ctx.beginPath(); ctx.moveTo(x,GROUND); ctx.lineTo(x,H); ctx.stroke(); }
   for(let y=GROUND+16;y<H;y+=18){ ctx.beginPath(); ctx.moveTo(0,y); ctx.lineTo(W,y); ctx.stroke(); }
+  const gloss=ctx.createRadialGradient(W*0.4,GROUND+14,10,W*0.4,GROUND+24,320);
+  gloss.addColorStop(0,'rgba(255,250,220,0.20)'); gloss.addColorStop(1,'rgba(255,250,220,0)');
+  ctx.fillStyle=gloss; ctx.fillRect(0,GROUND,W,H-GROUND);
   // 机（背景・生徒の座席）
   for(const d of SCH_DESKS) schDrawDesk(d.x,d.y,d.sc);
 }
 function schDrawDesk(x,y,sc){
   const w=44*sc, legH=26*sc;
-  ctx.fillStyle='#8f7038'; ctx.fillRect(x-w/2+3,y+2,4*sc,legH); ctx.fillRect(x+w/2-3-4*sc,y+2,4*sc,legH);
-  ctx.fillStyle='#caa06a'; ctx.fillRect(x-w/2,y-5,w,7);
-  ctx.fillStyle='#a87c48'; ctx.fillRect(x-w/2,y-5,w,3);
-  ctx.fillStyle='#7fb0d8'; ctx.fillRect(x-11*sc,y+legH-3,22*sc,4); // 椅子座面
-  ctx.fillStyle='#5f90b8'; ctx.fillRect(x-11*sc,y+legH-3,22*sc,2);
+  ctx.fillStyle='rgba(20,10,0,0.18)'; ctx.beginPath(); ctx.ellipse(x,y+legH+3,w*0.6,4,0,0,Math.PI*2); ctx.fill();
+  const leg=ctx.createLinearGradient(x-w/2,0,x+w/2,0);
+  leg.addColorStop(0,'#6b4f24'); leg.addColorStop(0.5,'#a87c48'); leg.addColorStop(1,'#6b4f24');
+  ctx.fillStyle=leg;
+  ctx.fillRect(x-w/2+3,y+2,4*sc,legH); ctx.fillRect(x+w/2-3-4*sc,y+2,4*sc,legH);
+  const top=ctx.createLinearGradient(0,y-5,0,y+2);
+  top.addColorStop(0,'#e6c692'); top.addColorStop(1,'#a87c48');
+  ctx.fillStyle=top; ctx.fillRect(x-w/2,y-5,w,7);
+  ctx.fillStyle='rgba(255,255,255,0.28)'; ctx.fillRect(x-w/2,y-5,w,2);
+  const seat=ctx.createLinearGradient(0,y+legH-3,0,y+legH+1);
+  seat.addColorStop(0,'#9cc7e8'); seat.addColorStop(1,'#5f90b8');
+  ctx.fillStyle=seat; ctx.fillRect(x-11*sc,y+legH-3,22*sc,4); // 椅子座面
+  ctx.fillStyle='rgba(255,255,255,0.3)'; ctx.fillRect(x-11*sc,y+legH-3,22*sc,1.4);
 }
 // 前景（生徒・先生・マーク）——ハザード描画フックから呼ばれる
 function drawSchool(){
@@ -1707,18 +1747,37 @@ function drawSchool(){
     ctx.globalAlpha=Math.min(1,m.t/18); ctx.fillStyle=m.col; ctx.font='bold 19px sans-serif'; ctx.textAlign='center';
     ctx.fillText(m.txt,m.x,m.y-(50-m.t)*0.5); ctx.globalAlpha=1; if(--m.t<=0) schoolMarks.splice(i,1); }
 }
+// 塗りつぶし後、同じパスへ斜めグラデーション（左上ハイライト/右下シャドウ）を重ねる簡易セルシェード
+function celOverlay(g,x,y,w,h){
+  const keep=g.fillStyle;
+  const grd=g.createLinearGradient(x,y,x+w*0.7,y+h);
+  grd.addColorStop(0,'rgba(255,255,255,0.28)'); grd.addColorStop(0.45,'rgba(255,255,255,0)'); grd.addColorStop(1,'rgba(0,0,0,0.22)');
+  g.fillStyle=grd; g.fillRect(x,y,w,h);
+  g.fillStyle=keep;
+}
+function celOverlayCircle(g,cx,cy,r){
+  const keep=g.fillStyle;
+  const grd=g.createRadialGradient(cx-r*0.35,cy-r*0.4,r*0.08,cx,cy,r);
+  grd.addColorStop(0,'rgba(255,255,255,0.30)'); grd.addColorStop(0.55,'rgba(255,255,255,0)'); grd.addColorStop(1,'rgba(0,0,0,0.20)');
+  g.fillStyle=grd; g.beginPath(); g.arc(cx,cy,r,0,Math.PI*2); g.fill();
+  g.fillStyle=keep;
+}
 function schDrawStudent(s){
   const sc=s.sc, seated=s.state==='seated';
   ctx.save(); ctx.translate(s.x,s.y);
+  ctx.fillStyle='rgba(20,10,0,0.16)'; ctx.beginPath(); ctx.ellipse(0,2*sc,10*sc,3*sc,0,0,Math.PI*2); ctx.fill();
   const wob=seated?Math.sin(s.wob)*1.2:0;
   if(!seated){ ctx.fillStyle='#33384a'; ctx.fillRect(-6*sc,-12*sc,4.5*sc,12*sc); ctx.fillRect(1.5*sc,-12*sc,4.5*sc,12*sc); } // 脚
   ctx.fillStyle=s.col; // 制服
-  if(seated) ctx.fillRect(-9*sc,-21*sc,18*sc,21*sc); else ctx.fillRect(-9*sc,-31*sc,18*sc,19*sc);
+  const bodyY=seated?-21*sc:-31*sc, bodyH=seated?21*sc:19*sc;
+  ctx.fillRect(-9*sc,bodyY,18*sc,bodyH);
+  celOverlay(ctx,-9*sc,bodyY,18*sc,bodyH);
   const headY=seated?-27*sc:-41*sc;
   if(!seated){ // 追跡中は前かがみで手を伸ばす
     ctx.strokeStyle='#ffd9a8'; ctx.lineWidth=3*sc; ctx.beginPath(); ctx.moveTo(0,-24*sc); ctx.lineTo(s.face*12*sc,-20*sc); ctx.stroke();
   }
   ctx.fillStyle='#ffd9a8'; ctx.beginPath(); ctx.arc(wob,headY,8*sc,0,Math.PI*2); ctx.fill(); // 頭
+  celOverlayCircle(ctx,wob,headY,8*sc);
   ctx.fillStyle='#3a2a1a'; ctx.beginPath(); ctx.arc(wob,headY-1.5*sc,8*sc,Math.PI,0); ctx.fill(); // 髪
   if(!seated){ ctx.fillStyle='#222'; ctx.fillRect(wob+s.face*2*sc-1,headY-1,2,2); } // 目
   ctx.restore();
@@ -1727,16 +1786,22 @@ function schDrawTeacher(t){
   const angry=t.state==='angry';
   const bob=Math.sin(t.step*0.2)*1.5;
   ctx.save(); ctx.translate(t.x,GROUND);
+  ctx.fillStyle='rgba(20,10,0,0.20)'; ctx.beginPath(); ctx.ellipse(0,2,15,4,0,0,Math.PI*2); ctx.fill();
   ctx.fillStyle='#333'; ctx.fillRect(-8,-22,6,22); ctx.fillRect(2,-22,6,22); // 脚
   ctx.fillStyle=angry?'#b5484a':'#6b7b8c'; ctx.fillRect(-13,-54+bob*0,26,32); // 上着
+  celOverlay(ctx,-13,-54,26,32);
   ctx.fillStyle='#e8e8e8'; ctx.fillRect(-5,-54,10,32); // シャツ
   ctx.fillStyle='#c0392b'; ctx.fillRect(-2,-54,4,15); // ネクタイ
+  ctx.fillStyle='rgba(255,255,255,0.3)'; ctx.fillRect(-2,-54,1.4,15);
   ctx.fillStyle='#ffd9a8'; ctx.beginPath(); ctx.arc(0,-64+bob,11,0,Math.PI*2); ctx.fill(); // 頭
+  celOverlayCircle(ctx,0,-64+bob,11);
   ctx.fillStyle='#222'; ctx.beginPath(); ctx.arc(0,-66+bob,11,Math.PI,0); ctx.fill(); // 髪
   ctx.strokeStyle='#222'; ctx.lineWidth=1.5; ctx.strokeRect(-8,-66+bob,6,5); ctx.strokeRect(2,-66+bob,6,5); // メガネ
   if(angry){ ctx.strokeStyle='#c0392b'; ctx.lineWidth=2; ctx.beginPath(); ctx.moveTo(-9,-72+bob); ctx.lineTo(-3,-68+bob); ctx.moveTo(9,-72+bob); ctx.lineTo(3,-68+bob); ctx.stroke(); }
   // 指し棒
-  ctx.strokeStyle='#8a5a2a'; ctx.lineWidth=2.5; ctx.beginPath(); ctx.moveTo(t.dir*8,-38); ctx.lineTo(t.dir*26,-30); ctx.stroke();
+  const stick=ctx.createLinearGradient(t.dir*8,-38,t.dir*26,-30);
+  stick.addColorStop(0,'#c9975a'); stick.addColorStop(1,'#6b4520');
+  ctx.strokeStyle=stick; ctx.lineWidth=2.5; ctx.beginPath(); ctx.moveTo(t.dir*8,-38); ctx.lineTo(t.dir*26,-30); ctx.stroke();
   ctx.restore();
   if(angry){ ctx.fillStyle='#ff3b30'; ctx.font='16px sans-serif'; ctx.textAlign='center'; ctx.fillText('💢',t.x+18,GROUND-76); }
 }
