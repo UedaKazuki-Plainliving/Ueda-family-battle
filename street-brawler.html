@@ -2580,7 +2580,14 @@ class Gorilla {
     ctx.fillText('ゴリラ',this.x,this.y-108);
   }
   _draw() {
-    const pOn=this.state==='punch'&&this.st>=6&&this.st<=18;
+    // パンチ: 振りかぶり→スナップ気味に突き出す→引き戻す、をイージングでつなぐ
+    // (以前は6-18フレームだけ腕が瞬間的に伸びる2ポーズ切り替えで、予備動作も戻りも無かった)
+    let phase='idle', armT=0;
+    if (this.state==='punch') {
+      if (this.st<6) { phase='wind'; armT=easeOutQuad(this.st/6); }
+      else if (this.st<=18) { phase='thrust'; armT=easeOutBack(Math.min(1,(this.st-6)/12)); }
+      else { phase='retract'; armT=Math.max(0,1-easeInOutQuad(Math.min(1,(this.st-18)/10))); }
+    }
     ctx.fillStyle='rgba(0,0,0,0.2)'; ctx.beginPath(); ctx.ellipse(0,2,25,7,0,0,Math.PI*2); ctx.fill();
     ctx.lineWidth=14; ctx.lineCap='round'; ctx.strokeStyle='#5a2e0e';
     ctx.beginPath(); ctx.moveTo(-8,-12); ctx.lineTo(-14,0); ctx.stroke();
@@ -2588,10 +2595,15 @@ class Gorilla {
     ctx.fillStyle='#7b4a2a'; ctx.fillRect(-22,-70,44,55);
     ctx.fillStyle='#9a6a40'; ctx.fillRect(-16,-65,32,40);
     ctx.lineWidth=13; ctx.strokeStyle='#7b4a2a';
-    if (pOn) {
-      ctx.beginPath(); ctx.moveTo(20,-58); ctx.lineTo(68,-52); ctx.stroke();
-      ctx.fillStyle='#7b4a2a'; ctx.beginPath(); ctx.arc(68,-52,11,0,Math.PI*2); ctx.fill();
-      ctx.beginPath(); ctx.moveTo(-20,-58); ctx.lineTo(-36,-35); ctx.stroke();
+    if (phase==='wind') {
+      ctx.beginPath(); ctx.moveTo(20,-58); ctx.lineTo(8-armT*16,-40-armT*6); ctx.stroke();
+      ctx.fillStyle='#7b4a2a'; ctx.beginPath(); ctx.arc(8-armT*16,-40-armT*6,11,0,Math.PI*2); ctx.fill();
+      ctx.beginPath(); ctx.moveTo(-20,-58); ctx.lineTo(-40,-22); ctx.stroke();
+    } else if (phase==='thrust'||phase==='retract') {
+      const reach=20+armT*48;
+      ctx.beginPath(); ctx.moveTo(20,-58); ctx.lineTo(reach,-52+armT*6); ctx.stroke();
+      ctx.fillStyle='#7b4a2a'; ctx.beginPath(); ctx.arc(reach,-52+armT*6,11,0,Math.PI*2); ctx.fill();
+      ctx.beginPath(); ctx.moveTo(-20,-58); ctx.lineTo(-36-armT*4,-35-armT*13); ctx.stroke();
     } else {
       ctx.beginPath(); ctx.moveTo(20,-58); ctx.lineTo(40,-22); ctx.stroke();
       ctx.beginPath(); ctx.moveTo(-20,-58); ctx.lineTo(-40,-22); ctx.stroke();
@@ -3166,7 +3178,13 @@ class HitoEffect {
     if (this.t<60&&Math.floor(this.t/6)%2===0) return;
     ctx.save(); ctx.translate(this.x,GROUND);
     if (this.dir===-1) ctx.scale(-1,1);
-    const pOn=this.state==='punch'&&this.st>=5&&this.st<=15;
+    // パンチ: Gorillaと同じイージング付き振りかぶり→突き出し→引き戻し
+    let phase='idle', armT=0;
+    if (this.state==='punch') {
+      if (this.st<5) { phase='wind'; armT=easeOutQuad(this.st/5); }
+      else if (this.st<=15) { phase='thrust'; armT=easeOutBack(Math.min(1,(this.st-5)/10)); }
+      else { phase='retract'; armT=Math.max(0,1-easeInOutQuad(Math.min(1,(this.st-15)/13))); }
+    }
     ctx.fillStyle='#ffcc99';
     ctx.fillRect(-10,-75,20,40);
     ctx.beginPath(); ctx.arc(0,-83,14,0,Math.PI*2); ctx.fill();
@@ -3177,9 +3195,12 @@ class HitoEffect {
     ctx.beginPath(); ctx.arc(0,-80,5,0.2,Math.PI-0.2); ctx.stroke();
     ctx.fillStyle='#3366cc'; ctx.fillRect(-10,-35,8,35); ctx.fillRect(2,-35,8,35);
     ctx.fillStyle='#ffcc99'; ctx.lineWidth=8; ctx.strokeStyle='#ffcc99'; ctx.lineCap='round';
-    if (pOn) {
-      ctx.beginPath(); ctx.moveTo(10,-65); ctx.lineTo(58,-58); ctx.stroke();
+    if (phase==='wind') {
+      ctx.beginPath(); ctx.moveTo(10,-65); ctx.lineTo(2-armT*12,-52-armT*4); ctx.stroke();
       ctx.beginPath(); ctx.moveTo(-10,-65); ctx.lineTo(-25,-40); ctx.stroke();
+    } else if (phase==='thrust'||phase==='retract') {
+      ctx.beginPath(); ctx.moveTo(10,-65); ctx.lineTo(10+armT*48,-58+armT*4); ctx.stroke();
+      ctx.beginPath(); ctx.moveTo(-10,-65); ctx.lineTo(-25-armT*4,-40-armT*10); ctx.stroke();
     } else {
       ctx.beginPath(); ctx.moveTo(10,-65); ctx.lineTo(25,-40); ctx.stroke();
       ctx.beginPath(); ctx.moveTo(-10,-65); ctx.lineTo(-25,-40); ctx.stroke();
@@ -3286,17 +3307,28 @@ class MBGorillaEffect {
     if (this.t<90&&Math.floor(this.t/6)%2===0) return;
     ctx.save(); ctx.translate(this.x,GROUND);
     if (this.dir===-1) ctx.scale(-1,1);
-    const pOn=this.state==='punch'&&this.st>=6&&this.st<=20;
+    // パンチ: Gorillaと同じく、振りかぶり→スナップで突き出す→引き戻すをイージングでつなぐ
+    let phase='idle', armT=0;
+    if (this.state==='punch') {
+      if (this.st<6) { phase='wind'; armT=easeOutQuad(this.st/6); }
+      else if (this.st<=20) { phase='thrust'; armT=easeOutBack(Math.min(1,(this.st-6)/14)); }
+      else { phase='retract'; armT=Math.max(0,1-easeInOutQuad(Math.min(1,(this.st-20)/10))); }
+    }
     ctx.lineWidth=18; ctx.lineCap='round'; ctx.strokeStyle='#4a1e07';
     ctx.beginPath(); ctx.moveTo(-10,-14); ctx.lineTo(-18,0); ctx.stroke();
     ctx.beginPath(); ctx.moveTo(10,-14); ctx.lineTo(18,0); ctx.stroke();
     ctx.fillStyle='#6a3a1a'; ctx.fillRect(-28,-90,56,70);
     ctx.fillStyle='#8a5a30'; ctx.fillRect(-20,-84,40,54);
     ctx.lineWidth=18; ctx.strokeStyle='#6a3a1a';
-    if (pOn) {
-      ctx.beginPath(); ctx.moveTo(28,-75); ctx.lineTo(90,-68); ctx.stroke();
-      ctx.fillStyle='#6a3a1a'; ctx.beginPath(); ctx.arc(90,-68,14,0,Math.PI*2); ctx.fill();
-      ctx.beginPath(); ctx.moveTo(-28,-75); ctx.lineTo(-46,-48); ctx.stroke();
+    if (phase==='wind') {
+      ctx.beginPath(); ctx.moveTo(28,-75); ctx.lineTo(14-armT*20,-52-armT*8); ctx.stroke();
+      ctx.fillStyle='#6a3a1a'; ctx.beginPath(); ctx.arc(14-armT*20,-52-armT*8,14,0,Math.PI*2); ctx.fill();
+      ctx.beginPath(); ctx.moveTo(-28,-75); ctx.lineTo(-52,-32); ctx.stroke();
+    } else if (phase==='thrust'||phase==='retract') {
+      const reach=28+armT*62;
+      ctx.beginPath(); ctx.moveTo(28,-75); ctx.lineTo(reach,-70+armT*8); ctx.stroke();
+      ctx.fillStyle='#6a3a1a'; ctx.beginPath(); ctx.arc(reach,-70+armT*8,14,0,Math.PI*2); ctx.fill();
+      ctx.beginPath(); ctx.moveTo(-28,-75); ctx.lineTo(-46-armT*6,-48-armT*16); ctx.stroke();
     } else {
       ctx.beginPath(); ctx.moveTo(28,-75); ctx.lineTo(52,-32); ctx.stroke();
       ctx.beginPath(); ctx.moveTo(-28,-75); ctx.lineTo(-52,-32); ctx.stroke();
