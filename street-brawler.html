@@ -599,6 +599,14 @@ const GFX = (function () {
 })();
 GFX.target = ctx;
 
+/* ---------- モーション用イージング関数 ----------
+   キャラの動き（パンチ・キック等）を、等速の直線移動ではなく
+   「タメ→加速→インパクト→減速して収まる」自然なカーブに乗せるために使う。 */
+function easeOutQuad(t)   { return 1 - (1 - t) * (1 - t); }
+function easeInQuad(t)    { return t * t; }
+function easeInOutQuad(t) { return t < 0.5 ? 2 * t * t : 1 - Math.pow(-2 * t + 2, 2) / 2; }
+function easeOutBack(t)   { const c1 = 1.70158, c3 = c1 + 1; return 1 + c3 * Math.pow(t - 1, 3) + c1 * Math.pow(t - 1, 2); }
+
 GFX.resize(CANVAS_H);
 
 /* canvas のサイズ変更後に高DPIバックバッファを取り直す */
@@ -4490,7 +4498,9 @@ class Fighter {
     const kickOn=(s==='kick'&&this.st>=def.kickS&&this.st<=def.kickE)||
                  (s==='jkick'&&this.st>=def.kickS&&this.st<=def.kickE);
     const isSpecial=s==='special';
-    const chargeRaise=isSpecial?Math.min(1,this.st/10):0;
+    // 溜め動作: 上がりきったあとは小刻みに震わせて「力が満ちている」感を出す
+    const chargeRaise=isSpecial?easeOutQuad(Math.min(1,this.st/10)):0;
+    const chargeShake=isSpecial&&this.st>10?Math.sin(this.st*2.3)*1.4:0;
     const bodyTop=(crouching?-50:-84)+bob;
     const bodyH  =crouching?28:48;
     const beltY  =(crouching?-30:-44)+bob;
@@ -4499,64 +4509,110 @@ class Fighter {
     const footY  =crouching?-8:-18;
     GFX.bodyCY = bodyTop + bodyH/2;   // 四肢の付け根判定に使う
 
+    // 体全体の重心移動・前後傾き（打撃時、体重が乗って見えるように全身を連動させる）
+    let lean=0, shiftX=0;
+    let kickPhase=0, kickRange=1, kickP=0;
+    if (kickOn) {
+      kickPhase = this.st - def.kickS;
+      kickRange = def.kickE - def.kickS;
+      kickP = kickPhase / kickRange;
+      if (kickP < 0.30) {           // タメ: 軸足に体重を残し、わずかに後傾
+        const t=easeOutQuad(kickP/0.30); lean=-0.11*t; shiftX=-2.5*t;
+      } else if (kickP < 0.62) {    // 踏み込み: 前傾しながら加速
+        const t=Math.min(1,(kickP-0.30)/0.32); lean=-0.11+0.27*easeOutQuad(t); shiftX=-2.5+6*easeOutQuad(t);
+      } else {                      // 戻り: 前傾から直立へ減速収束
+        const t=(kickP-0.62)/0.38; lean=0.16-0.16*easeInOutQuad(t); shiftX=3.5-3.5*easeInOutQuad(t);
+      }
+    } else if (punchOn) {           // パンチも重心をわずかに前へ
+      const pp=(this.st-def.punchS)/(def.punchE-def.punchS);
+      if (pp<0.5){ const t=easeOutQuad(pp/0.5); lean=0.06*t; shiftX=2*t; }
+      else { const t=easeInOutQuad((pp-0.5)/0.5); lean=0.06-0.06*t; shiftX=2-2*t; }
+    } else if (jatkOn) {             // 空中パンチ: 突き上げに合わせて体をわずかに伸ばす
+      const jp=Math.min(1,Math.max(0,(this.st-def.jatkS)/Math.max(1,def.jatkE-def.jatkS)));
+      const t=jp<0.4?easeOutQuad(jp/0.4):1-easeInOutQuad((jp-0.4)/0.6)*0.3;
+      lean=0.05*t;
+    } else if (isSpecial) {          // 必殺技の溜め: 力をためて後方へ踏ん張るように反り返る
+      lean=-0.05*chargeRaise; shiftX=-1.5*chargeRaise;
+    } else if (s==='super') {
+      // 超必殺技: フェーズ0=力を溜めて反り返る、フェーズ1以降=前に踏み込んで放つ
+      // (18キャラ共通のここを直すと、専用モーションを持たない大半のキャラの見た目が一括で良くなる)
+      const superRaise=easeOutQuad(Math.min(1,this.st/10));
+      if ((this.superPhase||0)===0) { lean=-0.07*superRaise; shiftX=-2*superRaise; }
+      else { lean=0.08; shiftX=3; }
+    } else if (s==='walk') {         // 歩行: 重心が一歩ごとに左右へわずかに揺れる
+      lean=Math.sin(this.af)*0.035;
+    }
+    ctx.save(); ctx.rotate(lean); ctx.translate(shiftX,0);
+
     ctx.lineWidth=lw; ctx.lineCap='round'; ctx.strokeStyle=c2;
     if (kickOn) {
-      // キック3段階モーション
-      const kickPhase = this.st - def.kickS;
-      const kickRange = def.kickE - def.kickS;
+      // キック4段階モーション: タメ→ひざ上げ→スナップ蹴り出し(オーバーシュートで勢いを表現)→引き戻し
       const shoe=(fx,fy,ang)=>{ // 靴（甲＋靴底）。ang: つま先方向の角度
         ctx.save(); ctx.translate(fx,fy); ctx.rotate(ang);
         ctx.fillStyle=c2; ctx.beginPath(); ctx.ellipse(lw*0.3,0,lw*1.15,lw*0.6,0,0,Math.PI*2); ctx.fill();
         ctx.fillStyle='rgba(0,0,0,0.3)'; ctx.beginPath(); ctx.ellipse(lw*0.3,lw*0.34,lw*1.1,lw*0.24,0,0,Math.PI*2); ctx.fill();
         ctx.restore();
       };
-      if (kickPhase < kickRange * 0.36) {
-        // 前半: ひざを上げる
-        const t = kickPhase / (kickRange * 0.36);
-        const kneeRaise = t * 28;
-        // 軸足: 少し屈む
-        ctx.beginPath(); ctx.moveTo(0,footY+6); ctx.lineTo(-10,-36+4); ctx.stroke();
-        shoe(-10,-32,0.15);
-        // 蹴り足: ひざ高く
-        ctx.beginPath(); ctx.moveTo(0,footY+6); ctx.lineTo(16,-26-kneeRaise); ctx.stroke();
-        ctx.beginPath(); ctx.moveTo(16,-26-kneeRaise); ctx.lineTo(24,-16-kneeRaise+10); ctx.stroke();
-        shoe(24,-6-kneeRaise,0.9);
-      } else if (kickPhase < kickRange * 0.72) {
-        // 中盤: 蹴り出し
-        const t = (kickPhase - kickRange*0.36) / (kickRange * 0.36);
+      // 股関節（胴体下端の内側）: 蹴り足・軸足とも、ここから生えるようにして胴とのつながりを自然にする
+      const hipY = bodyTop+bodyH-4;
+      // 軸足: 股関節→ひざ(曲げ)→足首・靴、の3節で描く（旧版は足首と靴の位置が逆で宙に浮いて見えたのを修正）
+      const plantLeg=(kx,ky,ax,ay,ang)=>{
+        ctx.beginPath(); ctx.moveTo(0,hipY); ctx.quadraticCurveTo(kx*0.7,(hipY+ky)/2,kx,ky); ctx.stroke();
+        ctx.beginPath(); ctx.moveTo(kx,ky); ctx.lineTo(ax,ay); ctx.stroke();
+        shoe(ax,ay,ang);
+      };
+      if (kickP < 0.30) {
+        // 前半: 軸足にタメを作りつつ、蹴り足のひざを畳んで引き上げる
+        const t = easeOutQuad(kickP/0.30);
+        const kneeRaise = t * 30, crouch = t * 4;
+        plantLeg(-10,-25-crouch*0.4,-13-crouch*0.5,footY+crouch*0.8,0.12);
+        ctx.beginPath(); ctx.moveTo(0,hipY); ctx.lineTo(17,-24-kneeRaise); ctx.stroke();
+        ctx.beginPath(); ctx.moveTo(17,-24-kneeRaise); ctx.lineTo(23,-14-kneeRaise+8); ctx.stroke();
+        shoe(23,-4-kneeRaise,1.0);
+      } else if (kickP < 0.62) {
+        // 中盤: ひざの伸びで蹴り出す。終盤にわずかにオーバーシュートさせ「効いた」勢いを付ける
+        const t = easeOutBack(Math.max(0,Math.min(1,(kickP-0.30)/0.32)));
         const ext = t;
-        ctx.beginPath(); ctx.moveTo(0,footY+4); ctx.lineTo(-8,-36+3); ctx.stroke();
-        shoe(-8,-33,0.1);
-        ctx.beginPath(); ctx.moveTo(0,footY+4); ctx.lineTo(20+ext*22,-26+ext*14); ctx.stroke();
-        ctx.beginPath(); ctx.moveTo(20+ext*22,-26+ext*14); ctx.lineTo(42+ext*14,-10+ext*2); ctx.stroke();
-        shoe(42+ext*14,-10+ext*2,1.45);
+        plantLeg(-9,-26,-12,footY,0.08);
+        ctx.beginPath(); ctx.moveTo(0,hipY); ctx.lineTo(20+ext*24,-26+ext*16); ctx.stroke();
+        ctx.beginPath(); ctx.moveTo(20+ext*24,-26+ext*16); ctx.lineTo(44+ext*16,-10+ext*3); ctx.stroke();
+        shoe(44+ext*16,-10+ext*3,1.5);
       } else {
-        // 後半: 足が戻る
-        const t = (kickPhase - kickRange*0.72) / (kickRange * 0.28);
+        // 後半: 減速しながら足を引き戻し、静止姿勢へ自然に収束させる
+        const t = easeInOutQuad((kickP-0.62)/0.38);
         const ret = t;
-        ctx.beginPath(); ctx.moveTo(0,footY+2); ctx.lineTo(-9,-36+2); ctx.stroke();
-        shoe(-9,-34,0.1);
-        ctx.beginPath(); ctx.moveTo(0,footY+2); ctx.lineTo(30-ret*20,-14+ret*2); ctx.stroke();
-        ctx.beginPath(); ctx.moveTo(30-ret*20,-14+ret*2); ctx.lineTo(46-ret*28,-8+ret*2); ctx.stroke();
-        shoe(46-ret*28,-8+ret*2,1.2-ret*0.5);
+        plantLeg(-9,-26,-12,footY,0.08);
+        ctx.beginPath(); ctx.moveTo(0,hipY); ctx.lineTo(32-ret*22,-14+ret*4); ctx.stroke();
+        ctx.beginPath(); ctx.moveTo(32-ret*22,-14+ret*4); ctx.lineTo(48-ret*30,-8+ret*4); ctx.stroke();
+        shoe(48-ret*30,-8+ret*4,1.2-ret*0.6);
       }
     } else if (crouching) {
-      // しゃがみ: 両ひざを外に開く安定姿勢
-      ctx.beginPath(); ctx.moveTo(-4,bodyTop+bodyH); ctx.lineTo(-26,-4); ctx.stroke();
-      ctx.beginPath(); ctx.moveTo(4,bodyTop+bodyH); ctx.lineTo(26,-4); ctx.stroke();
+      // しゃがみ: 両ひざを外に開く安定姿勢（ひざで折って直線の棒足にしない）
+      [-1,1].forEach(sd=>{
+        const kneeX=sd*20, kneeY=-14, ankX=sd*26, ankY=-4;
+        ctx.beginPath(); ctx.moveTo(sd*4,bodyTop+bodyH); ctx.lineTo(kneeX,kneeY); ctx.stroke();
+        ctx.beginPath(); ctx.moveTo(kneeX,kneeY); ctx.lineTo(ankX,ankY); ctx.stroke();
+      });
     } else if (s==='jump'||s==='jatk'||s==='jkick') {
-      // ジャンプ: 上昇/下降で足の形を変える
-      if (this.vy < 0) {
-        // 上昇中: ひざを引き上げる（足を畳む）
-        ctx.beginPath(); ctx.moveTo(-4,footY); ctx.lineTo(-14,-28); ctx.stroke();
-        ctx.beginPath(); ctx.moveTo(-14,-28); ctx.lineTo(-10,-16); ctx.stroke();
-        ctx.beginPath(); ctx.moveTo(4,footY); ctx.lineTo(14,-28); ctx.stroke();
-        ctx.beginPath(); ctx.moveTo(14,-28); ctx.lineTo(10,-16); ctx.stroke();
-      } else {
-        // 下降中: 足を伸ばして着地準備
-        ctx.beginPath(); ctx.moveTo(0,footY); ctx.lineTo(-12,-36); ctx.stroke();
-        ctx.beginPath(); ctx.moveTo(0,footY); ctx.lineTo(12,-36); ctx.stroke();
-      }
+      // ジャンプ: 上昇(ひざを畳む)⇔下降(足を伸ばす)を vy で連続的にブレンドし、
+      // 頂点付近で瞬間的に足の形が切り替わる不自然さをなくす
+      const fall = easeInOutQuad(Math.max(0, Math.min(1, (this.vy + 5) / 10)));
+      [-1, 1].forEach(sd => {
+        const hipX = sd * (4 - fall * 4);
+        const kneeX = sd * (14 - fall * 7), kneeY = -28 - fall * 4;
+        const ankX  = sd * (10 + fall * 2), ankY  = -16 - fall * 20;
+        ctx.beginPath(); ctx.moveTo(hipX, footY); ctx.lineTo(kneeX, kneeY); ctx.stroke();
+        ctx.beginPath(); ctx.moveTo(kneeX, kneeY); ctx.lineTo(ankX, ankY); ctx.stroke();
+      });
+    } else if (s==='super') {
+      // 超必殺技: どっしり踏ん張った広い安定スタンス（専用モーションのないキャラの土台になる）
+      const phase=this.superPhase||0;
+      [-1,1].forEach(sd=>{
+        const kneeX=sd*(18+phase*3), kneeY=-20;
+        const ankX=sd*(24+phase*5), ankY=-3;
+        ctx.beginPath(); ctx.moveTo(sd*5,bodyTop+bodyH); ctx.lineTo(kneeX,kneeY); ctx.stroke();
+        ctx.beginPath(); ctx.moveTo(kneeX,kneeY); ctx.lineTo(ankX,ankY); ctx.stroke();
+      });
     } else {
       // 立ち／歩き: 腰・膝・足首の 2 節構造にして、足先を接地させる
       [[-1, -swing], [1, swing]].forEach(([sd, sw2]) => {
@@ -4698,20 +4754,58 @@ class Fighter {
       ctx.beginPath(); ctx.arc(bw/2-6,aY-26,lw*0.8,0,Math.PI*2); ctx.fill();
       ctx.beginPath(); ctx.arc(bw/2-2,aY-24,lw*0.8,0,Math.PI*2); ctx.fill();
     } else if (isSpecial&&(def.id==='icchi'||def.id==='soyo'||def.id==='okaasan'||def.id==='otousan'||def.id==='kuppa'||def.id==='kinopio'||def.id==='mario'||def.id==='luigi'||def.id==='pikachu'||def.id==='doraemon'||def.id==='jogo'||def.id==='gojo'||def.id==='zenitsu'||def.id==='rengoku'||def.id==='tanjiro'||def.id==='akaza')) {
-      const raise=chargeRaise*28;
-      ctx.beginPath(); ctx.moveTo(bw/2-4,aY); ctx.lineTo(bw/2+18,aY-21-raise); ctx.stroke();
-      ctx.beginPath(); ctx.moveTo(-bw/2+4,aY); ctx.lineTo(-bw/2-18,aY-21-raise); ctx.stroke();
+      const raise=chargeRaise*28+chargeShake;
+      ctx.beginPath(); ctx.moveTo(bw/2-4,aY); ctx.lineTo(bw/2+18+chargeShake,aY-21-raise); ctx.stroke();
+      ctx.beginPath(); ctx.moveTo(-bw/2+4,aY); ctx.lineTo(-bw/2-18-chargeShake,aY-21-raise); ctx.stroke();
       if (chargeRaise>0.3) {
         ctx.globalAlpha=chargeRaise; ctx.fillStyle=c1;
         ctx.shadowBlur=10; ctx.shadowColor=c1;
-        ctx.beginPath(); ctx.arc(bw/2+18,aY-21-raise,5*chargeRaise,0,Math.PI*2); ctx.fill();
-        ctx.beginPath(); ctx.arc(-bw/2-18,aY-21-raise,5*chargeRaise,0,Math.PI*2); ctx.fill();
+        ctx.beginPath(); ctx.arc(bw/2+18+chargeShake,aY-21-raise,5*chargeRaise,0,Math.PI*2); ctx.fill();
+        ctx.beginPath(); ctx.arc(-bw/2-18-chargeShake,aY-21-raise,5*chargeRaise,0,Math.PI*2); ctx.fill();
         ctx.shadowBlur=0; ctx.globalAlpha=1;
       }
+    } else if (s==='super') {
+      // 超必殺技: フェーズ0=両腕を掲げて力を集める(震え付き)、フェーズ1以降=前へ突き出して放つ
+      // 専用の腕モーションを持たないキャラでも、ここで一括して「構え」が付く
+      const phase=this.superPhase||0;
+      const raise=easeOutQuad(Math.min(1,this.st/10));
+      const shake=this.st>10?Math.sin(this.st*2.1)*1.8:0;
+      if (phase===0) {
+        ctx.beginPath(); ctx.moveTo(bw/2-4,aY); ctx.lineTo(bw/2+16+shake,aY-24-raise*10); ctx.stroke();
+        ctx.beginPath(); ctx.moveTo(-bw/2+4,aY); ctx.lineTo(-bw/2-16-shake,aY-24-raise*10); ctx.stroke();
+        ctx.fillStyle='#FFCC99';
+        ctx.beginPath(); ctx.arc(bw/2+16+shake,aY-24-raise*10,lw*0.75,0,Math.PI*2); ctx.fill();
+        ctx.beginPath(); ctx.arc(-bw/2-16-shake,aY-24-raise*10,lw*0.75,0,Math.PI*2); ctx.fill();
+      } else {
+        ctx.beginPath(); ctx.moveTo(bw/2-4,aY); ctx.lineTo(bw/2+30,aY-8); ctx.stroke();
+        ctx.beginPath(); ctx.moveTo(-bw/2+4,aY); ctx.lineTo(bw/2+14,aY-14); ctx.stroke();
+        ctx.fillStyle='#FFCC99';
+        ctx.beginPath(); ctx.arc(bw/2+30,aY-8,lw*0.8,0,Math.PI*2); ctx.fill();
+      }
+      ctx.lineWidth=lw; ctx.strokeStyle=c1;
     } else if (jatkOn) {
-      ctx.beginPath(); ctx.moveTo(bw/2-4,aY); ctx.lineTo(bw/2+8,aY-26); ctx.stroke();
-      ctx.fillStyle='#FFCC99'; ctx.beginPath(); ctx.arc(bw/2+8,aY-26,lw*0.75,0,Math.PI*2); ctx.fill();
-      ctx.beginPath(); ctx.moveTo(-bw/2+4,aY); ctx.lineTo(-bw/2-6,aY-23); ctx.stroke();
+      // 空中パンチ: 突き上げ→わずかに戻す、をイージングでつなぐ（今までは静止ポーズ固定だった）
+      const jp = Math.min(1,Math.max(0,(this.st-def.jatkS)/Math.max(1,def.jatkE-def.jatkS)));
+      const raise = jp<0.4 ? easeOutQuad(jp/0.4) : 1-easeInOutQuad((jp-0.4)/0.6)*0.3;
+      const fx=bw/2+4+raise*8, fy=aY-16-raise*14;
+      ctx.beginPath(); ctx.moveTo(bw/2-4,aY); ctx.lineTo(fx,fy); ctx.stroke();
+      ctx.fillStyle='#FFCC99'; ctx.beginPath(); ctx.arc(fx,fy,lw*0.75,0,Math.PI*2); ctx.fill();
+      ctx.lineWidth=lw; ctx.strokeStyle=c1;
+      const bx=-bw/2-4-raise*3, by=aY-14-raise*9;
+      ctx.beginPath(); ctx.moveTo(-bw/2+4,aY); ctx.lineTo(bx,by); ctx.stroke();
+      ctx.fillStyle='#FFCC99'; ctx.beginPath(); ctx.arc(bx,by,lw*0.6,0,Math.PI*2); ctx.fill();
+      ctx.lineWidth=lw; ctx.strokeStyle=c1;
+    } else if (s==='kick') {
+      // キック: 蹴り足側の腕を下げ、逆の腕を大きく後方へ振り上げて反作用のバランスを取る
+      const kr=Math.max(1,def.kickE-def.kickS);
+      const p=Math.min(1,Math.max(0,(this.st-def.kickS)/kr));
+      const swingArm = p<0.30 ? easeOutQuad(p/0.30) : (p<0.62 ? 1 : 1-easeInOutQuad((p-0.62)/0.38)*0.4);
+      ctx.beginPath(); ctx.moveTo(bw/2-4,aY); ctx.lineTo(bw/2+6,aY+18-swingArm*4); ctx.stroke();
+      ctx.fillStyle='#FFCC99'; ctx.beginPath(); ctx.arc(bw/2+6,aY+18-swingArm*4,lw*0.7,0,Math.PI*2); ctx.fill();
+      ctx.lineWidth=lw; ctx.strokeStyle=c1;
+      ctx.beginPath(); ctx.moveTo(-bw/2+4,aY); ctx.lineTo(-bw/2-13-swingArm*9,aY-13-swingArm*15); ctx.stroke();
+      ctx.fillStyle='#FFCC99'; ctx.beginPath(); ctx.arc(-bw/2-13-swingArm*9,aY-13-swingArm*15,lw*0.7,0,Math.PI*2); ctx.fill();
+      ctx.lineWidth=lw; ctx.strokeStyle=c1;
     } else if (s==='jump'||s==='jkick') {
       // ジャンプ中の腕: 上昇中は広げてバランス、下降中は前に構える
       if (this.vy < 0) {
@@ -4739,8 +4833,17 @@ class Fighter {
       ctx.beginPath();ctx.arc(bw/2+16,aY-30-bt,lw*0.85,0,Math.PI*2);ctx.fill();
       ctx.beginPath();ctx.arc(-bw/2-16,aY-30-bt,lw*0.85,0,Math.PI*2);ctx.fill();
     } else {
-      ctx.beginPath(); ctx.moveTo(bw/2-4,aY); ctx.lineTo(bw/2+12,aY+16+swing); ctx.stroke();
-      ctx.beginPath(); ctx.moveTo(-bw/2+4,aY); ctx.lineTo(-bw/2-12,aY+16-swing); ctx.stroke();
+      // 立ち／歩き: ひじを曲げた2節腕。歩行時は同側の脚と逆位相に振って自然な対側歩行にする
+      // (元の直線1本腕と同じ「横位置は固定、縦にswingで振る」座標系を踏襲し、肘の分だけ立体感を足す)
+      [[1, -swing], [-1, swing]].forEach(([sd, sw2]) => {
+        const shX = sd*(bw/2-4),  shY = aY;
+        const elX = sd*(bw/2+7),  elY = aY+9+sw2*0.5;
+        const haX = sd*(bw/2+12), haY = aY+18+sw2;
+        ctx.beginPath(); ctx.moveTo(shX,shY); ctx.lineTo(elX,elY); ctx.stroke();
+        ctx.beginPath(); ctx.moveTo(elX,elY); ctx.lineTo(haX,haY); ctx.stroke();
+        ctx.fillStyle='#FFCC99'; ctx.beginPath(); ctx.arc(haX,haY,lw*0.62,0,Math.PI*2); ctx.fill();
+        ctx.lineWidth=lw; ctx.strokeStyle=c1;
+      });
     }
 
     const hy=headCY; // headCYは既にbob込み
@@ -5086,6 +5189,7 @@ class Fighter {
       ctx.beginPath(); ctx.moveTo(1,hy-3); ctx.lineTo(-0,hy-3); ctx.stroke();
       ctx.beginPath(); ctx.moveTo(11,hy-3); ctx.lineTo(14,hy-2); ctx.stroke();
     }
+    ctx.restore();   // lean/shiftX (重心移動)
     ctx.restore();
   }
 
