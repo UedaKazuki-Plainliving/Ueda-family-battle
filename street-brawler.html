@@ -3389,6 +3389,10 @@ class DragonEffect {
   }
 }
 
+// 髪の遅れ追従(_hairSway)の対象: 左右に垂れる房を持つ「なびく髪」スタイルだけに適用する
+// (horns/mushroom/cap/ears/round等の帽子・固い装飾はここに含めない)
+const SWAY_HAIR_STYLES = new Set(['bobboy','longbang','longnofringe','bobglasses','gojo']);
+
 // ---- Fighter ----
 class Fighter {
   constructor(x,facingRight,def) {
@@ -3407,7 +3411,7 @@ class Fighter {
     this.pose=null;
     this.landSquashT=0; this._prevGrounded=true; this._fallVy=0; // 着地演出用
     this._koFxDone=false; // KO演出（一度きり）用
-    this._hairSway=0; this._hairSwayVel=0; // 髪の遅れ追従（試作: bobboyスタイルのみ）用
+    this._hairSway=0; this._hairSwayVel=0; this._prevDir=this.dir; // 髪の遅れ追従（試作: bobboyスタイルのみ）用
     this._lastStepIdx=0; // 歩行の足音ダスト用
   }
   hurtbox() {
@@ -4592,9 +4596,11 @@ class Fighter {
       const settle=1-easeInOutQuad(Math.min(1,this.st/hurtDur));  // スタン中はゆっくり姿勢を戻す
       lean=-0.10*settle-0.14*snap; shiftX=-3*settle-5*snap;
     }
-    // 髪の遅れ追従（試作: 体が傾いてから一拍遅れてバネのように追いかける。今のところ bobboy スタイルのみ）
-    if (def.hairStyle==='bobboy') {
-      const hairTarget=Math.max(-0.35,Math.min(0.35,lean*0.9));
+    // 髪の遅れ追従: 体が傾いてから一拍遅れてバネのように追いかける（なびく髪スタイルのみ）
+    if (SWAY_HAIR_STYLES.has(def.hairStyle)) {
+      if (this._prevDir!==this.dir) this._hairSwayVel+=this.dir*0.22; // 振り向いた瞬間、髪が振られる
+      this._prevDir=this.dir;
+      const hairTarget=Math.max(-0.35,Math.min(0.35,lean*0.9+swing*0.006));
       this._hairSwayVel=this._hairSwayVel*0.80+(hairTarget-this._hairSway)*0.30;
       this._hairSway+=this._hairSwayVel;
     }
@@ -4954,7 +4960,7 @@ class Fighter {
       ctx.fillStyle=c2; ctx.fillRect(-4,hy-13,8,4);
     } else if (hs==='bobboy') {
       // おかっぱ風の黒髪少年: 頭の丸に沿って黒髪がかぶさり、左右に少し垂れる
-      // 試作: 髪全体を頭の中心で軽くピボットし、体の傾きに一拍遅れて揺れる(_hairSway)ようにする
+      // 髪全体を頭の中心で軽くピボットし、体の傾きに一拍遅れて揺れる(_hairSway)ようにする
       ctx.save(); ctx.translate(0,hy); ctx.rotate(this._hairSway); ctx.translate(0,-hy);
       ctx.fillStyle='#111111';
       ctx.beginPath(); ctx.arc(0,hy-8,14,Math.PI,0); ctx.fill();
@@ -4968,7 +4974,8 @@ class Fighter {
       ctx.fillRect(-14,hy-12,28,7);
       ctx.restore();
     } else if (hs==='longbang') {
-      // 茶色の長い髪+前髪: ゆうり
+      // 茶色の長い髪+前髪: ゆうり（髪の遅れ追従あり）
+      ctx.save(); ctx.translate(0,hy); ctx.rotate(this._hairSway); ctx.translate(0,-hy);
       ctx.fillStyle='#aa7744';
       ctx.beginPath(); ctx.moveTo(-13,hy-16); ctx.bezierCurveTo(-24,hy-2,-26,hy+22,-18,hy+50);
       ctx.lineTo(-12,hy+48); ctx.bezierCurveTo(-16,hy+20,-14,hy-2,-5,hy-17); ctx.closePath(); ctx.fill();
@@ -4980,8 +4987,10 @@ class Fighter {
       ctx.bezierCurveTo(5,hy+2,10,hy-2,14,hy-8);
       ctx.lineTo(11,hy-11); ctx.bezierCurveTo(7,hy-6,3,hy-2,0,hy-3);
       ctx.bezierCurveTo(-3,hy-2,-8,hy-5,-12,hy-12); ctx.closePath(); ctx.fill();
+      ctx.restore();
     } else if (hs==='longnofringe') {
-      // 黒の長い髪、前髪なし: そよ
+      // 黒の長い髪、前髪なし: そよ（髪の遅れ追従あり）
+      ctx.save(); ctx.translate(0,hy); ctx.rotate(this._hairSway); ctx.translate(0,-hy);
       ctx.fillStyle='#111111';
       ctx.beginPath(); ctx.moveTo(-12,hy-18); ctx.bezierCurveTo(-22,hy-4,-24,hy+24,-16,hy+52);
       ctx.lineTo(-10,hy+50); ctx.bezierCurveTo(-14,hy+22,-12,hy-2,-4,hy-19); ctx.closePath(); ctx.fill();
@@ -4990,8 +4999,10 @@ class Fighter {
       ctx.beginPath(); ctx.arc(0,hy-12,14,Math.PI,0); ctx.fill();
       // 前髪なし: トップをしっかり覆う
       ctx.fillRect(-14,hy-20,28,10);
+      ctx.restore();
     } else if (hs==='bobglasses') {
-      // 黒髪ボブ: おかあさん
+      // 黒髪ボブ: おかあさん（髪の遅れ追従あり）
+      ctx.save(); ctx.translate(0,hy); ctx.rotate(this._hairSway); ctx.translate(0,-hy);
       ctx.fillStyle='#111111';
       ctx.beginPath(); ctx.moveTo(-14,hy-16); ctx.bezierCurveTo(-22,hy-4,-22,hy+14,-14,hy+18);
       ctx.lineTo(-10,hy+16); ctx.bezierCurveTo(-16,hy+10,-16,hy-4,-10,hy-16); ctx.closePath(); ctx.fill();
@@ -4999,6 +5010,7 @@ class Fighter {
       ctx.lineTo(8,hy+16); ctx.bezierCurveTo(14,hy+10,14,hy-4,8,hy-16); ctx.closePath(); ctx.fill();
       ctx.beginPath(); ctx.arc(0,hy-10,14,Math.PI,0); ctx.fill();
       ctx.fillRect(-14,hy-16,28,8);
+      ctx.restore();
     } else if (hs==='perm') {
       // 短め天然パーマ+前髪: おとうさん
       ctx.fillStyle='#333322';
@@ -5117,7 +5129,8 @@ class Fighter {
       ctx.beginPath(); ctx.moveTo(-10,hy-18); ctx.lineTo(-7,hy-32); ctx.lineTo(-3,hy-18); ctx.closePath(); ctx.fill();
       ctx.beginPath(); ctx.moveTo(4,hy-18); ctx.lineTo(8,hy-32); ctx.lineTo(12,hy-18); ctx.closePath(); ctx.fill();
     } else if (hs==='gojo') {
-      // 五条悟: 白髪、目隠し（黒いバンダナ）
+      // 五条悟: 白髪、目隠し（黒いバンダナ）（髪の遅れ追従あり）
+      ctx.save(); ctx.translate(0,hy); ctx.rotate(this._hairSway); ctx.translate(0,-hy);
       ctx.fillStyle='#eeeeee';
       ctx.beginPath(); ctx.arc(0,hy-10,14,Math.PI,0); ctx.fill();
       ctx.fillRect(-14,hy-16,28,8);
@@ -5132,6 +5145,7 @@ class Fighter {
       // 目隠しのハイライト
       ctx.fillStyle='rgba(100,100,150,0.2)';
       ctx.fillRect(-14,hy-8,28,3);
+      ctx.restore();
     } else if (hs==='zenitsu') {
       // 善逸: 金髪、前に流れる毛＋ツンとした毛先
       ctx.fillStyle='#ffd633';
