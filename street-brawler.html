@@ -5411,7 +5411,9 @@ function checkCollision(a,b) {
     if (info&&b.takeHit(info,a.dir)) {
       if (a.state!=='special'&&a.state!=='super') a.atkHit=true;
       if (a.state!=='special'&&a.state!=='super') a.specialGauge=Math.min(a.maxSpecialGauge,a.specialGauge+16);
-      spawnHit((a.x+b.x)/2,b.y-72,a.state==='special'||a.state==='super');
+      // ダウン・KOなど「効いた」瞬間は通常攻撃でも派手な演出(大きい火花・強めのシェイク)にする
+      const bigMoment=a.state==='special'||a.state==='super'||b.state==='down'||b.state==='dead'||b.hp<=0;
+      spawnHit((a.x+b.x)/2,b.y-72,bigMoment);
     }
   }
 }
