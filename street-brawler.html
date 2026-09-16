@@ -3987,11 +3987,12 @@ class Fighter {
     }
     this._prevGrounded=this.onGround;
     // KO演出（原因(通常技/必殺/DOT等)を問わず、dead へ切り替わった瞬間に一度だけ発火する見た目だけの処理）
+    // 色は超必殺(白)・必殺(キャラ色)と被らない金色にして、「決着の瞬間」だと一目でわかるようにする
     if (this.state==='dead'&&!this._koFxDone) {
       this._koFxDone=true;
-      screenFlash={t:20,color:'#ffffff'};
-      if (typeof GFX!=='undefined') { GFX.shake(9,16); GFX.punch(0.045); }
-      hitStopFrames=Math.max(hitStopFrames,20);
+      screenFlash={t:22,color:'#ffcc33'};
+      if (typeof GFX!=='undefined') { GFX.shake(11,20); GFX.punch(0.06); }
+      hitStopFrames=Math.max(hitStopFrames,24);
     }
     // 歩行中の足音ダスト（半周期ごと＝一歩ごとに小さく舞う）
     if (this.state==='walk') {
