@@ -4524,7 +4524,10 @@ class Fighter {
     const bw=def.bodyW,lw=def.limbW;
     const crouching=s==='crouch';
     const swing=s==='walk'?Math.sin(this.af)*16:0;
-    const bob=s==='walk'?Math.abs(Math.sin(this.af))*3.5:0; // 歩行時、着地のたびに体全体がわずかに沈む
+    // 歩行時は着地のたびに体全体がわずかに沈む／それ以外の待機姿勢では緩やかな呼吸で沈む（見た目だけ・判定には影響しない）
+    const bob=s==='walk'?Math.abs(Math.sin(this.af))*3.5
+             :(s==='idle'||s==='block'||s==='crouch')?Math.sin(Date.now()/480+this.x*0.02)*0.9+0.9
+             :0;
     const punchOn=s==='punch'&&this.st>=def.punchS&&this.st<=def.punchE&&!def.punchIsProjectile;
     const jatkOn=s==='jatk'&&this.st>=def.jatkS&&this.st<=def.jatkE;
     const kickOn=(s==='kick'&&this.st>=def.kickS&&this.st<=def.kickE)||
@@ -4573,6 +4576,12 @@ class Fighter {
       else { lean=0.08; shiftX=3; }
     } else if (s==='walk') {         // 歩行: 重心が一歩ごとに左右へわずかに揺れる
       lean=Math.sin(this.af)*0.035;
+    } else if (s==='hurt') {
+      // 被弾: ヒットした瞬間に大きくのけぞり、スタンが切れるまでに姿勢を立て直す
+      const hurtDur=Math.max(1,def.hitStunGiven);
+      const snap=easeOutQuad(Math.max(0,1-this.st/4));            // 被弾直後の一瞬だけ強く反る
+      const settle=1-easeInOutQuad(Math.min(1,this.st/hurtDur));  // スタン中はゆっくり姿勢を戻す
+      lean=-0.10*settle-0.14*snap; shiftX=-3*settle-5*snap;
     }
     ctx.save(); ctx.rotate(lean); ctx.translate(shiftX,0);
 
@@ -4606,6 +4615,16 @@ class Fighter {
         const t = easeOutBack(Math.max(0,Math.min(1,(kickP-0.30)/0.32)));
         const ext = t;
         plantLeg(-9,-26,-12,footY,0.08);
+        if (ext>0.2) {
+          // スナップキックの残像（実体の脚より先に薄く描いて速さを強調する）
+          ctx.save(); ctx.lineCap='round';
+          [0.45,0.72].forEach((k,i)=>{
+            const e2=ext*k;
+            ctx.globalAlpha=0.16*(1-i*0.4);
+            ctx.beginPath(); ctx.moveTo(20+e2*24,-26+e2*16); ctx.lineTo(44+e2*16,-10+e2*3); ctx.stroke();
+          });
+          ctx.restore();
+        }
         ctx.beginPath(); ctx.moveTo(0,hipY); ctx.lineTo(20+ext*24,-26+ext*16); ctx.stroke();
         ctx.beginPath(); ctx.moveTo(20+ext*24,-26+ext*16); ctx.lineTo(44+ext*16,-10+ext*3); ctx.stroke();
         shoe(44+ext*16,-10+ext*3,1.5);
@@ -4714,6 +4733,15 @@ class Fighter {
       const punchHalf = punchRange * 0.5;
       if (punchPhase < punchHalf) {
         // 前半: 腕が勢いよく前に飛び出す（伸びきった状態）
+        if (punchPhase < 5) {
+          // 突き出した瞬間の残像（チャンバー→伸びきりが一瞬で切り替わるので、速さを補って見せる）
+          ctx.save(); ctx.lineCap='round';
+          [0.5,0.75].forEach((k,i)=>{
+            ctx.globalAlpha=0.18*(1-i*0.4);
+            ctx.beginPath(); ctx.moveTo(bw/2-4,aY); ctx.lineTo(bw/2-4+54*k,aY-2*k); ctx.stroke();
+          });
+          ctx.restore();
+        }
         ctx.beginPath(); ctx.moveTo(bw/2-4,aY); ctx.lineTo(bw/2+50,aY-2); ctx.stroke();
         // ナックル（拳）を描く
         ctx.fillStyle='#FFCC99';
@@ -4864,6 +4892,18 @@ class Fighter {
       ctx.fillStyle='#FFCC99';
       ctx.beginPath();ctx.arc(bw/2+16,aY-30-bt,lw*0.85,0,Math.PI*2);ctx.fill();
       ctx.beginPath();ctx.arc(-bw/2-16,aY-30-bt,lw*0.85,0,Math.PI*2);ctx.fill();
+    } else if (s==='hurt') {
+      // 被弾: 衝撃で両腕が跳ね上がり、スタンが切れるまでにだらりと下がっていく
+      const hurtDur=Math.max(1,def.hitStunGiven);
+      const snap=easeOutQuad(Math.max(0,1-this.st/5));
+      const settle=1-easeInOutQuad(Math.min(1,this.st/hurtDur));
+      const raise=snap*22+settle*5;
+      ctx.beginPath(); ctx.moveTo(bw/2-4,aY); ctx.lineTo(bw/2+14+snap*10,aY-raise); ctx.stroke();
+      ctx.fillStyle='#FFCC99'; ctx.beginPath(); ctx.arc(bw/2+14+snap*10,aY-raise,lw*0.7,0,Math.PI*2); ctx.fill();
+      ctx.lineWidth=lw; ctx.strokeStyle=c1;
+      ctx.beginPath(); ctx.moveTo(-bw/2+4,aY); ctx.lineTo(-bw/2-14-snap*10,aY-raise*0.8); ctx.stroke();
+      ctx.fillStyle='#FFCC99'; ctx.beginPath(); ctx.arc(-bw/2-14-snap*10,aY-raise*0.8,lw*0.7,0,Math.PI*2); ctx.fill();
+      ctx.lineWidth=lw; ctx.strokeStyle=c1;
     } else {
       // 立ち／歩き: ひじを曲げた2節腕。歩行時は同側の脚と逆位相に振って自然な対側歩行にする
       // (元の直線1本腕と同じ「横位置は固定、縦にswingで振る」座標系を踏襲し、肘の分だけ立体感を足す)
@@ -5147,7 +5187,10 @@ class Fighter {
         ctx.beginPath();ctx.arc(-7,hy+3,2.5,0,Math.PI*2);ctx.fill();
         ctx.beginPath();ctx.arc(6,hy+3,2.5,0,Math.PI*2);ctx.fill();
       } else {
-        ctx.fillStyle='#222'; ctx.fillRect(4,hy-5,5,4);
+        // まばたき: 個体差を出すため x 座標で位相をずらし、全員が同時に瞬きしないようにする
+        const blinking=((Date.now()/50+this.x*3.7)|0)%220<4;
+        if (blinking) { ctx.strokeStyle='#222'; ctx.lineWidth=2; ctx.beginPath(); ctx.moveTo(4,hy-3); ctx.lineTo(9,hy-3); ctx.stroke(); }
+        else { ctx.fillStyle='#222'; ctx.fillRect(4,hy-5,5,4); }
       }
     } else {
       // カービィの目: 大きな楕円
