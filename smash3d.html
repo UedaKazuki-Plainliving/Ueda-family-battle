@@ -127,28 +127,42 @@ canvas#gl{position:absolute;inset:0;width:100%;height:100%;display:block}
   animation:fadein .3s ease both}
 
 /* ---------- タッチ操作 ---------- */
-#touch{position:absolute;inset:0;z-index:6;display:none;pointer-events:none}
+#touch{position:absolute;inset:0;z-index:6;display:none;pointer-events:none;
+  /* 画面の高さに追従させる。小さい端末でも指が届き、大きい端末でも大きくなりすぎない */
+  --tb:clamp(44px,10.5vh,66px);        /* ボタンの径 */
+  --tstick:clamp(92px,25vh,132px);     /* スティックの径 */
+  --tl:calc(14px + env(safe-area-inset-left,0px));
+  --tr:calc(14px + env(safe-area-inset-right,0px));
+  --tbot:calc(10px + var(--safe-b))}
 #touch.on{display:block}
-.stick{position:absolute;left:calc(16px + env(safe-area-inset-left,0px));bottom:calc(70px + var(--safe-b));
-  width:132px;height:132px;border-radius:50%;background:radial-gradient(circle,rgba(255,255,255,.09),rgba(255,255,255,.03));
+.stick{position:absolute;left:var(--tl);bottom:var(--tbot);
+  width:var(--tstick);height:var(--tstick);border-radius:50%;
+  background:radial-gradient(circle,rgba(255,255,255,.09),rgba(255,255,255,.03));
   border:1px solid var(--line);pointer-events:auto;backdrop-filter:blur(6px)}
-.stick i{position:absolute;left:50%;top:50%;width:56px;height:56px;margin:-28px 0 0 -28px;border-radius:50%;
+.stick i{position:absolute;left:50%;top:50%;width:42%;height:42%;margin:-21% 0 0 -21%;border-radius:50%;
   background:radial-gradient(circle at 35% 30%,#fff,#9fb0d8);opacity:.8;box-shadow:0 6px 18px rgba(0,0,0,.5)}
-.btns{position:absolute;right:calc(14px + env(safe-area-inset-right,0px));bottom:calc(66px + var(--safe-b));
-  width:186px;height:186px;pointer-events:none}
-.btn{position:absolute;width:66px;height:66px;border-radius:50%;pointer-events:auto;display:grid;place-items:center;
-  font-size:12px;font-weight:900;letter-spacing:.06em;color:#fff;border:1px solid rgba(255,255,255,.22);
+.btns{position:absolute;right:var(--tr);bottom:var(--tbot);
+  width:calc(var(--tb)*2.5);height:calc(var(--tb)*3.1);pointer-events:none}
+.btn{position:absolute;width:var(--tb);height:var(--tb);border-radius:50%;pointer-events:auto;
+  display:grid;place-items:center;font-size:calc(var(--tb)*.195);font-weight:900;letter-spacing:.04em;
+  color:#fff;border:1px solid rgba(255,255,255,.22);
   background:radial-gradient(circle at 34% 28%,rgba(255,255,255,.30),rgba(255,255,255,.06));
   box-shadow:0 8px 22px rgba(0,0,0,.45);backdrop-filter:blur(8px);transition:transform .08s,filter .08s}
 .btn.press{transform:scale(.9);filter:brightness(1.5)}
-.btn.a{right:78px;bottom:0;background:radial-gradient(circle at 34% 28%,rgba(255,90,120,.85),rgba(190,30,60,.45))}
-.btn.b{right:8px;bottom:56px;background:radial-gradient(circle at 34% 28%,rgba(90,170,255,.85),rgba(20,80,190,.45))}
-.btn.s{right:96px;bottom:70px;width:56px;height:56px;background:radial-gradient(circle at 34% 28%,rgba(255,205,90,.85),rgba(200,130,10,.45))}
-.btn.g{right:24px;bottom:126px;width:52px;height:52px;background:radial-gradient(circle at 34% 28%,rgba(150,255,190,.8),rgba(20,150,90,.4))}
-.btn.u{right:96px;bottom:140px;width:54px;height:54px;font-size:11px;opacity:.32;pointer-events:none;
+.btn.a{right:calc(var(--tb)*1.15);bottom:0;
+  background:radial-gradient(circle at 34% 28%,rgba(255,90,120,.85),rgba(190,30,60,.45))}
+.btn.b{right:0;bottom:calc(var(--tb)*.9);
+  background:radial-gradient(circle at 34% 28%,rgba(90,170,255,.85),rgba(20,80,190,.45))}
+.btn.s{right:calc(var(--tb)*1.55);bottom:calc(var(--tb)*1.15);width:calc(var(--tb)*.85);height:calc(var(--tb)*.85);
+  background:radial-gradient(circle at 34% 28%,rgba(255,205,90,.85),rgba(200,130,10,.45))}
+.btn.g{right:calc(var(--tb)*.2);bottom:calc(var(--tb)*2.05);width:calc(var(--tb)*.8);height:calc(var(--tb)*.8);
+  background:radial-gradient(circle at 34% 28%,rgba(150,255,190,.8),rgba(20,150,90,.4))}
+.btn.u{right:calc(var(--tb)*1.5);bottom:calc(var(--tb)*2.2);width:calc(var(--tb)*.85);height:calc(var(--tb)*.85);
+  font-size:calc(var(--tb)*.175);opacity:.3;pointer-events:none;
   background:radial-gradient(circle at 34% 28%,rgba(255,150,255,.9),rgba(140,20,190,.5))}
 .btn.u.rdy{opacity:1;pointer-events:auto;animation:supglow .7s ease-in-out infinite alternate}
-.btn.j{left:calc(20px + env(safe-area-inset-left,0px));bottom:calc(214px + var(--safe-b));width:60px;height:60px;
+.btn.j{left:calc(var(--tl) + var(--tstick)*.86);bottom:calc(var(--tbot) + var(--tstick)*.88);
+  width:calc(var(--tb)*.92);height:calc(var(--tb)*.92);
   background:radial-gradient(circle at 34% 28%,rgba(220,220,255,.8),rgba(90,90,160,.4))}
 .pausebtn{position:absolute;left:12px;top:calc(10px + env(safe-area-inset-top,0px));width:38px;height:38px;border-radius:11px;
   pointer-events:auto;display:grid;place-items:center;background:var(--glass);border:1px solid var(--line);
@@ -189,12 +203,28 @@ canvas#gl{position:absolute;inset:0;width:100%;height:100%;display:block}
   .go{padding:11px 40px;font-size:14.5px;letter-spacing:.16em}
 }
 @media (max-height:470px){
-  .info{display:none}
+  /* 情報パネルは消さず、技名だけ残して詰める */
+  .info{grid-template-columns:1fr}
+  .info .panel+.panel{display:none}
+  .panel p{display:none}
+  .panel{padding:6px 11px}
+  .panel h3{margin:0;font-size:12px}
   .cc{aspect-ratio:5/4}
   .cc .por{font-size:clamp(18px,4.6vw,30px)}
-  .ports{bottom:calc(4px + var(--safe-b))}
-  .port{padding:4px 5px 5px}
+  .ports{bottom:calc(4px + var(--safe-b));gap:5px}
+  .port{padding:4px 5px 5px;width:clamp(54px,10.5vw,86px)}
+  .port .pct{font-size:clamp(16px,4vw,24px)}
 }
+
+/* ---------- 縦持ちの案内 ---------- */
+#rotate{position:absolute;inset:0;z-index:30;display:none;flex-direction:column;align-items:center;
+  justify-content:center;gap:14px;padding:24px;text-align:center;
+  background:rgba(4,5,11,.94);backdrop-filter:blur(8px)}
+#rotate.on{display:flex}
+#rotate .ricon{font-size:clamp(46px,16vw,72px);animation:rot90 2.4s ease-in-out infinite}
+@keyframes rot90{0%,28%{transform:rotate(0)}52%,100%{transform:rotate(-90deg)}}
+#rotate .rtx{font-size:clamp(17px,5.4vw,25px);font-weight:900;letter-spacing:.12em}
+#rotate .rsub{font-size:12px;color:var(--dim);letter-spacing:.1em}
 
 /* ---------- ロード ---------- */
 #load{background:#05060c;z-index:40}
@@ -259,9 +289,16 @@ canvas#gl{position:absolute;inset:0;width:100%;height:100%;display:block}
       <div class="seg"><span class="lb">人数</span><button data-o="cnt" data-v="2">2人</button><button data-o="cnt" data-v="3">3人</button><button data-o="cnt" data-v="4" class="on">4人</button></div>
       <div class="seg"><span class="lb">ストック</span><button data-o="stock" data-v="2">2</button><button data-o="stock" data-v="3" class="on">3</button><button data-o="stock" data-v="5">5</button></div>
       <div class="seg"><span class="lb">CPU</span><button data-o="lv" data-v="1">弱</button><button data-o="lv" data-v="2" class="on">普通</button><button data-o="lv" data-v="3">強</button><button data-o="lv" data-v="4">鬼</button></div>
-      <div class="seg"><span class="lb">画質</span><button data-o="q" data-v="3">最高</button><button data-o="q" data-v="2" class="on">高</button><button data-o="q" data-v="1">軽量</button></div>
+      <div class="seg"><span class="lb">画質</span><button data-o="q" data-v="3">最高</button><button data-o="q" data-v="2" class="on">高</button><button data-o="q" data-v="1">軽量</button><button data-o="q" data-v="0">省電力</button></div>
     </div>
     <button class="go" id="gobtn">乱 闘 開 始</button>
+  </div>
+
+  <!-- 縦持ちのときの案内 -->
+  <div id="rotate">
+    <div class="ricon">📱</div>
+    <div class="rtx">横向きにしてください</div>
+    <div class="rsub">このゲームは横画面でプレイします</div>
   </div>
 
   <!-- ポーズ -->
@@ -317,19 +354,29 @@ const loadTx=(p,t)=>{ $('#lbar').style.width=(p*100)+'%'; if(t) $('#ltx').textCo
 
 /* ---------------------------------------------------------------- 設定 */
 const QUALITY={
-  3:{name:'最高', dpr:2.0, shadow:2560, bloom:true, ssao:true,  grade:true, smaa:true,  parts:1.0, softShadow:true,  aniso:8},
-  2:{name:'高',   dpr:1.6, shadow:1536, bloom:true, ssao:false, grade:true, smaa:true,  parts:0.8, softShadow:true,  aniso:4},
-  1:{name:'軽量', dpr:1.1, shadow:1024, bloom:true, ssao:false, grade:true, smaa:false, parts:0.5, softShadow:false, aniso:2},
+  3:{name:'最高',  dpr:2.0,  shadow:2560, bloom:true,  ssao:true,  grade:true, smaa:true,  parts:1.0,  softShadow:true,  aniso:8, shadows:true},
+  2:{name:'高',    dpr:1.6,  shadow:1536, bloom:true,  ssao:false, grade:true, smaa:true,  parts:0.8,  softShadow:true,  aniso:4, shadows:true},
+  1:{name:'軽量',  dpr:1.1,  shadow:1024, bloom:true,  ssao:false, grade:true, smaa:false, parts:0.5,  softShadow:false, aniso:2, shadows:true},
+  /* スマホ向け: 影とブルームを落とし、内部解像度も下げる */
+  0:{name:'省電力',dpr:0.75, shadow:512,  bloom:false, ssao:false, grade:true, smaa:false, parts:0.28, softShadow:false, aniso:1, shadows:false},
 };
 const CFG={ quality:2, players:4, stocks:3, cpuLv:2, time:150, sound:true };
 
-/* 端末性能からの初期画質推定 */
+/* タッチ端末か（判定は1回だけ作って使い回す） */
+const COARSE=matchMedia('(pointer:coarse)');
+const IS_TOUCH=()=>COARSE.matches;
+
+/* 端末性能からの初期画質推定。
+   スマホは最初から軽めに始めて、足りなければ手動で上げてもらう。 */
 (function autoQuality(){
   const mem=navigator.deviceMemory||4, cores=navigator.hardwareConcurrency||4;
-  const mobile=/Android|iPhone|iPad|iPod/i.test(navigator.userAgent);
+  const ua=navigator.userAgent;
+  /* iOS は deviceMemory 非対応・コア数も頭打ちで報告されるため、性能の目安に使えない */
+  const ios=/iPhone|iPad|iPod/i.test(ua)||(navigator.platform==='MacIntel'&&navigator.maxTouchPoints>1);
+  const mobile=ios||/Android/i.test(ua)||COARSE.matches;
   let q = 2;
-  if(mobile && (mem<=4||cores<=4)) q=1;
-  if(!mobile && mem>=8 && cores>=8) q=3;
+  if(mobile) q = ios ? 1 : ((mem<=3||cores<=4) ? 0 : 1);
+  else if(mem>=8 && cores>=8) q=3;
   CFG.quality=q;
   $$('[data-o="q"]').forEach(b=>b.classList.toggle('on', +b.dataset.v===q));
 })();
@@ -400,8 +447,8 @@ function pollInput(){
   const set=(dx,dy)=>{
     const d=Math.hypot(dx,dy)||1, s=Math.min(1,d/R);
     kn.style.transform=`translate(${dx/d*R*s}px,${dy/d*R*s}px)`;
-    IN.touch.x = Math.abs(dx)>18 ? Math.sign(dx) : 0;
-    IN.touch.y = Math.abs(dy)>20 ? -Math.sign(dy) : 0;
+    IN.touch.x = Math.abs(dx)>R*.34 ? Math.sign(dx) : 0;
+    IN.touch.y = Math.abs(dy)>R*.38 ? -Math.sign(dy) : 0;
     if(IN.touch.y>0) IN.touch.jump=1;
   };
   const reset=()=>{ kn.style.transform='translate(0,0)'; IN.touch.x=IN.touch.y=0; IN.touch.jump=0; IN.touch.active=false; };
@@ -423,7 +470,11 @@ function pollInput(){
     b.addEventListener('mousedown',on); b.addEventListener('mouseup',off); b.addEventListener('mouseleave',off);
   });
   $('#pausebtn').addEventListener('click',togglePause);
-  if(matchMedia('(pointer:coarse)').matches) $('#touch').classList.add('on');
+  const syncTouchLayer=()=>$('#touch').classList.toggle('on',COARSE.matches);
+  syncTouchLayer();
+  /* 後からゲームパッドを繋いだ / PC のタッチ画面などにも追従する */
+  if(COARSE.addEventListener) COARSE.addEventListener('change',syncTouchLayer);
+  else if(COARSE.addListener) COARSE.addListener(syncTouchLayer);
 })();
 
 /* ------------------------------------------------------------ サウンド */
@@ -509,7 +560,7 @@ try{
   renderer=new THREE.WebGLRenderer({canvas,antialias:false,powerPreference:'high-performance',stencil:false});
 }catch(e){ fatal('WebGL を初期化できませんでした。'); throw e; }
 renderer.setPixelRatio(Math.min(devicePixelRatio||1, QUALITY[CFG.quality].dpr));
-renderer.shadowMap.enabled=true;
+renderer.shadowMap.enabled=QUALITY[CFG.quality].shadows!==false;
 renderer.shadowMap.type=THREE.PCFSoftShadowMap;
 renderer.toneMapping=THREE.ACESFilmicToneMapping;
 renderer.toneMappingExposure=0.78;
@@ -761,11 +812,26 @@ buildComposer();
 function applyQuality(q){
   CFG.quality=q; const Q=QUALITY[q];
   renderer.setPixelRatio(Math.min(devicePixelRatio||1,Q.dpr));
+  /* 影のオン・オフを切り替えたらマテリアルを組み直す必要がある */
+  const wantShadow=Q.shadows!==false;
+  if(renderer.shadowMap.enabled!==wantShadow){
+    renderer.shadowMap.enabled=wantShadow;
+    scene.traverse(o=>{ if(!o.material) return;
+      (Array.isArray(o.material)?o.material:[o.material]).forEach(m=>{ m.needsUpdate=true; }); });
+  }
   renderer.shadowMap.type=Q.softShadow?THREE.PCFSoftShadowMap:THREE.PCFShadowMap;
   sun.shadow.mapSize.set(Q.shadow,Q.shadow);
   if(sun.shadow.map){ sun.shadow.map.dispose(); sun.shadow.map=null; }
   sun.shadow.radius=Q.softShadow?3.2:1;
   buildComposer(); onResize();
+}
+/* 縦持ちのあいだは試合を止める（横画面前提の操作系のため） */
+let portraitHold=false;
+function checkOrient(){
+  const need = COARSE.matches && innerHeight>innerWidth && (MODE==='play'||MODE==='pause');
+  if(need===portraitHold) return;
+  portraitHold=need;
+  const el=document.getElementById('rotate'); if(el) el.classList.toggle('on',need);
 }
 function onResize(){
   const w=innerWidth,h=innerHeight;
@@ -775,7 +841,20 @@ function onResize(){
   if(smaaPass) smaaPass.setSize(w*renderer.getPixelRatio(),h*renderer.getPixelRatio());
   if(ssaoPass) ssaoPass.setSize(w,h);
 }
-addEventListener('resize',onResize); onResize();
+addEventListener('resize',()=>{ onResize(); checkOrient(); }); onResize();
+/* iOS は回転直後のサイズが確定していないことがあるので少し遅らせて測り直す */
+addEventListener('orientationchange',()=>{ setTimeout(()=>{ onResize(); checkOrient(); },260); });
+
+/* 描画コンテキストが失われたら（スマホでバックグラウンドに回されたときなど）読み直す */
+canvas.addEventListener('webglcontextlost',e=>{
+  e.preventDefault();
+  const l=document.getElementById('load'); if(!l) return;
+  l.classList.add('on');
+  const sp=document.getElementById('spin'); if(sp) sp.style.display='none';
+  const tx=document.getElementById('ltx');
+  if(tx) tx.innerHTML='<div class="err">描画が中断されました。<br><br>まもなく再読み込みします…</div>';
+  setTimeout(()=>location.reload(),1800);
+},false);
 
 /* --------------------------------------------------------- 便利マテリアル */
 function matPBR(o){ return new THREE.MeshPhysicalMaterial(Object.assign({roughness:.7,metalness:.02},o)); }
@@ -3470,18 +3549,22 @@ const HUD={
    ===================================================================== */
 let MODE='boot', matchT=0, countdown=0, endT=0, selected=CHARS[0].key;
 const DEMO=[];
-const DEMO_KEYS=['icchi','otousan','okaasan','mario','pikachu','gojo','rengoku'];
+/* タイトル/選択画面に並べる見本。スマホは描画負荷を下げるため少なめにする */
+const DEMO_KEYS = IS_TOUCH()
+  ? ['icchi','otousan','okaasan','pikachu']
+  : ['icchi','otousan','okaasan','mario','pikachu','gojo','rengoku'];
+const DEMO_X0 = -(DEMO_KEYS.length-1)*1.25;
 function buildDemo(){
   const list=DEMO_KEYS.map(k=>CHARMAP[k]).filter(Boolean);
   list.forEach((def,i)=>{
     const rig=buildFighter(def);
-    rig.root.position.set(-7.5+i*2.50, 0, 2.2);
+    rig.root.position.set(DEMO_X0+i*2.50, 0, 2.2);
     rig.body.rotation.y=0;
     scene.add(rig.root);
-    DEMO.push({def,rig,S:def.body.scale,cur:basePose(),t:rand(0,9),homeX:-7.5+i*2.50,
+    DEMO.push({def,rig,S:def.body.scale,cur:basePose(),t:rand(0,9),homeX:DEMO_X0+i*2.50,
       shadow:(()=>{ const m=new THREE.Mesh(new THREE.PlaneGeometry(1,1),
         new THREE.MeshBasicMaterial({map:TEX.blob,transparent:true,depthWrite:false,opacity:.55,color:0x000000}));
-        m.rotation.x=-Math.PI/2; m.position.set(-7.5+i*2.50,.02,2.2);
+        m.rotation.x=-Math.PI/2; m.position.set(DEMO_X0+i*2.50,.02,2.2);
         const s=1.9*def.body.scale; m.scale.set(s,s,1); scene.add(m); return m; })()});
   });
 }
@@ -3628,7 +3711,16 @@ $$('.seg button').forEach(b=>{
 });
 $('#pressstart').addEventListener('click',()=>gotoSelect());
 $('#title').addEventListener('click',()=>gotoSelect());
-$('#gobtn').addEventListener('click',()=>{ AUD.start(); AUD.ding(880,.25); startMatch(); });
+/* スマホは全画面・横向き固定を試す。非対応の端末では静かに無視される */
+function goImmersive(){
+  if(!COARSE.matches) return;
+  const el=document.documentElement;
+  const rq=el.requestFullscreen||el.webkitRequestFullscreen;
+  if(rq){ try{ const p=rq.call(el); if(p&&p.catch) p.catch(()=>{}); }catch(e){} }
+  const so=screen.orientation;
+  if(so&&so.lock){ try{ const p=so.lock('landscape'); if(p&&p.catch) p.catch(()=>{}); }catch(e){} }
+}
+$('#gobtn').addEventListener('click',()=>{ goImmersive(); AUD.start(); AUD.ding(880,.25); startMatch(); });
 $('#again').addEventListener('click',()=>startMatch());
 $('#tosel2').addEventListener('click',()=>gotoSelect());
 $('#resume').addEventListener('click',()=>togglePause());
@@ -3649,6 +3741,12 @@ function togglePause(){
   if(MODE==='play'){ MODE='pause'; showLayer('#pause'); }
   else if(MODE==='pause'){ MODE='play'; showLayer(null); }
 }
+/* 画面を離れたら自動でポーズ。戻ってきたら音を鳴らし直せるようにする */
+addEventListener('visibilitychange',()=>{
+  if(document.hidden){ if(MODE==='play') togglePause(); }
+  else if(CFG.sound) AUD.start();
+});
+
 /* サウンド切替ボタンを PAUSE 画面に追加 */
 {
   const b=document.createElement('button'); b.className='btn2'; b.id='soundbtn';
@@ -3694,12 +3792,14 @@ function frame(now){
   fpsAcc+=real; fpsN++;
   if(fpsAcc>2.0){
     const fps=fpsN/fpsAcc; fpsAcc=0; fpsN=0;
-    if(fps<34&&CFG.quality>1&&autoDrop<2){ autoDrop++; applyQuality(CFG.quality-1);
+    if(fps<32&&CFG.quality>0&&autoDrop<3){ autoDrop++; applyQuality(CFG.quality-1);
       $$('[data-o="q"]').forEach(b=>b.classList.toggle('on',+b.dataset.v===CFG.quality)); }
   }
   pollInput();
 
-  if(MODE==='play'){
+  checkOrient();
+
+  if(MODE==='play' && !portraitHold){
     slowmo=Math.max(0,slowmo-real);
     const dt=real*(slowmo>0?.28:1);
     if(countdown>0){
@@ -3726,7 +3826,7 @@ function frame(now){
       CAM.fovT = fighters.some(f=>f.percent>110)?40:43;
     }
     CAM.update(real,true);
-  } else if(MODE==='pause'){
+  } else if(MODE==='pause' || portraitHold){
     CAM.update(real*.2,true);
   } else if(MODE==='result'){
     CAM.update(real,true);
