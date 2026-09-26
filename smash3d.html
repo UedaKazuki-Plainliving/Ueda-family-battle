@@ -60,12 +60,30 @@ canvas#gl{position:absolute;inset:0;width:100%;height:100%;display:block}
   transition:transform .16s cubic-bezier(.2,.9,.3,1.4),box-shadow .16s,border-color .16s}
 .cc:active{transform:scale(.96)}
 .cc.sel{border-color:var(--accent);box-shadow:0 0 0 2px rgba(255,176,32,.35),0 14px 40px rgba(255,140,20,.28);transform:translateY(-4px)}
+.cc.used{border-color:rgba(255,176,32,.40);background:linear-gradient(180deg,rgba(255,176,32,.10),rgba(255,255,255,.02))}
+
+/* 出場枠（P1 / CPU1〜3）。枠を選んでからキャラをタップして割り当てる */
+.slots{width:100%;max-width:1080px;display:flex;flex-wrap:wrap;gap:8px;justify-content:center}
+.slot{display:flex;align-items:center;gap:7px;padding:6px 12px 6px 8px;border-radius:13px;cursor:pointer;
+  border:1px solid var(--line);background:rgba(255,255,255,.05);color:var(--ink);font:inherit;
+  transition:border-color .16s,box-shadow .16s,background .16s}
+.slot .sl{font-size:9.5px;font-weight:900;letter-spacing:.1em;color:var(--dim);
+  padding:3px 7px;border-radius:999px;background:rgba(0,0,0,.42);white-space:nowrap}
+.slot .se{font-size:19px;line-height:1}
+.slot .sn{font-size:12px;font-weight:700;white-space:nowrap}
+.slot:active{transform:translateY(1px)}
+.slot.on{border-color:var(--accent);background:rgba(255,176,32,.14);
+  box-shadow:0 0 0 2px rgba(255,176,32,.30),0 8px 24px rgba(255,140,20,.20)}
+.slot.on .sl{background:var(--accent);color:#1a1200}
+.slot.rnd .sn{color:var(--dim)}
 .cc .por{position:absolute;inset:0;display:grid;place-items:center;font-size:clamp(34px,9vw,64px)}
 .cc .tint{position:absolute;inset:0;opacity:.55;mix-blend-mode:soft-light}
 .cc .nm{position:absolute;left:0;right:0;bottom:0;padding:8px 6px;font-size:clamp(10px,2.5vw,13px);
   font-weight:900;text-align:center;background:linear-gradient(180deg,transparent,rgba(0,0,0,.82))}
 .cc .cpu{position:absolute;top:6px;left:6px;font-size:9px;letter-spacing:.1em;padding:3px 7px;border-radius:999px;
-  background:rgba(0,0,0,.55);border:1px solid var(--line);color:var(--dim)}
+  background:rgba(0,0,0,.55);border:1px solid var(--line);color:var(--dim);transition:opacity .14s}
+.cc .cpu.off{opacity:0}
+.cc.used .cpu{background:rgba(255,176,32,.85);color:#1a1200;border-color:transparent}
 .cc.sel .cpu{background:var(--accent);color:#1a1200;border-color:transparent}
 .info{width:100%;max-width:1080px;display:grid;grid-template-columns:1.1fr 1fr;gap:12px}
 @media(max-width:760px){.info{grid-template-columns:1fr}}
@@ -200,6 +218,8 @@ canvas#gl{position:absolute;inset:0;width:100%;height:100%;display:block}
   .panel p{font-size:11px;line-height:1.6;max-height:4.9em;overflow:auto}
   .stat{margin:4px 0} .bar{height:6px}
   .opts{gap:6px} .seg button{padding:7px 10px;font-size:10.5px} .seg .lb{padding:7px 9px;font-size:9.5px}
+  .slots{gap:6px} .slot{padding:4px 9px 4px 6px;gap:5px}
+  .slot .se{font-size:16px} .slot .sn{font-size:11px} .slot .sl{font-size:9px;padding:2px 6px}
   .go{padding:11px 40px;font-size:14.5px;letter-spacing:.16em}
 }
 @media (max-height:470px){
@@ -278,8 +298,9 @@ canvas#gl{position:absolute;inset:0;width:100%;height:100%;display:block}
   <div class="layer" id="select">
     <div class="hdr">
       <h2>ファイター選択</h2>
-      <div class="sub" id="selhint">カードを選ぶ → 設定 → 乱闘開始　／　キー: 移動 WASD・攻撃 J・スマッシュ K・必殺 L・<b style="color:#e0a0ff">超必殺 U</b>・防御 I</div>
+      <div class="sub" id="selhint">枠をタップ → キャラをタップ で各プレイヤーを設定　／　キー: 移動 WASD・攻撃 J・スマッシュ K・必殺 L・<b style="color:#e0a0ff">超必殺 U</b>・防御 I</div>
     </div>
+    <div class="slots" id="slots"></div>
     <div class="grid" id="cgrid"></div>
     <div class="info">
       <div class="panel"><h3 id="pname">—</h3><p id="pdesc">—</p></div>
@@ -3548,6 +3569,10 @@ const HUD={
    モード管理
    ===================================================================== */
 let MODE='boot', matchT=0, countdown=0, endT=0, selected=CHARS[0].key;
+/* 出場枠。ROSTER[0] が自分、以降が CPU。枠を選んでからキャラを選ぶ */
+const SLOT_LABEL=['P1','CPU1','CPU2','CPU3'];
+const ROSTER=CHARS.slice(0,4).map(c=>c.key);
+let slotIdx=0;
 const DEMO=[];
 /* タイトル/選択画面に並べる見本。スマホは描画負荷を下げるため少なめにする */
 const DEMO_KEYS = IS_TOUCH()
@@ -3612,9 +3637,7 @@ function startMatch(){
   for(const f of fighters){ scene.remove(f.obj); scene.remove(f.shadow); scene.remove(f.shieldM); scene.remove(f.marker); }
   fighters=[];
   setDemoVisible(false);
-  const roster=[selected];
-  const rest=CHARS.map(c=>c.key).filter(k=>k!==selected);
-  for(let i=0;i<CFG.players-1;i++) roster.push(rest[(i*2+1)%rest.length]);
+  const roster=ROSTER.slice(0,CFG.players).map(k=>CHARMAP[k]?k:CHARS[0].key);
   const spawnX=[-6.5,6.5,-2.4,2.4];
   roster.forEach((k,i)=>{
     const f=new Fighter(CHARMAP[k],i,i===0);
@@ -3669,23 +3692,60 @@ function buildSelect(){
   const g=$('#cgrid'); g.innerHTML='';
   CHARS.forEach(c=>{
     const d=document.createElement('div');
-    d.className='cc'+(c.key===selected?' sel':'');
-    d.dataset.k=c.key;
+    d.className='cc'; d.dataset.k=c.key;
     d.innerHTML=`<div class="tint" style="background:linear-gradient(160deg,${c.tint},transparent 70%)"></div>
-      <div class="por">${c.emoji}</div><div class="cpu">${c.key===selected?'P1':'CPU'}</div>
+      <div class="por">${c.emoji}</div><div class="cpu off"></div>
       <div class="nm">${c.name}</div>`;
-    d.addEventListener('click',()=>{ selected=c.key; AUD.select(); refreshSelect(); });
+    /* タップしたキャラを、いま選んでいる枠に入れる */
+    d.addEventListener('click',()=>{ ROSTER[slotIdx]=c.key; selected=c.key; AUD.select(); refreshSelect(); });
     g.appendChild(d);
   });
+  buildSlots();
   refreshSelect();
+}
+function buildSlots(){
+  const s=$('#slots'); if(!s) return;
+  s.innerHTML='';
+  for(let i=0;i<CFG.players;i++){
+    const b=document.createElement('button');
+    b.className='slot'; b.dataset.i=i;
+    b.innerHTML=`<span class="sl">${SLOT_LABEL[i]}</span><span class="se"></span><span class="sn"></span>`;
+    b.addEventListener('click',()=>{ slotIdx=i; selected=ROSTER[i]; AUD.select(); refreshSelect(); });
+    s.appendChild(b);
+  }
+  /* CPU をまとめてランダムに決める */
+  const r=document.createElement('button');
+  r.className='slot rnd';
+  r.innerHTML='<span class="sl">CPU</span><span class="sn">おまかせ</span>';
+  r.addEventListener('click',()=>{
+    const pool=CHARS.map(c=>c.key).filter(k=>k!==ROSTER[0]);
+    for(let i=1;i<CFG.players;i++) ROSTER[i]=pool.splice(Math.floor(Math.random()*pool.length),1)[0];
+    selected=ROSTER[slotIdx]; AUD.select(); refreshSelect();
+  });
+  s.appendChild(r);
 }
 const STATLABEL={power:'パワー',speed:'スピード',weight:'重さ',range:'リーチ',jump:'ジャンプ'};
 function refreshSelect(){
+  if(!CHARMAP[selected]) selected=ROSTER[0];
   const c=CHARMAP[selected];
+  /* 枠の中身 */
+  $$('#slots .slot[data-i]').forEach(b=>{
+    const i=+b.dataset.i, cc=CHARMAP[ROSTER[i]];
+    b.classList.toggle('on', i===slotIdx);
+    b.querySelector('.se').textContent=cc?cc.emoji:'';
+    b.querySelector('.sn').textContent=cc?cc.name:'';
+  });
+  /* どのキャラがどの枠に入っているかをカードに出す */
+  const used={};
+  for(let i=0;i<CFG.players;i++) (used[ROSTER[i]]=used[ROSTER[i]]||[]).push(SLOT_LABEL[i].replace('CPU','C'));
+  const cur=ROSTER[slotIdx];
   $$('#cgrid .cc').forEach(d=>{
-    const on=d.dataset.k===selected;
-    d.classList.toggle('sel',on);
-    d.querySelector('.cpu').textContent=on?'P1':'CPU';
+    const k=d.dataset.k, u=used[k];
+    d.classList.toggle('sel', k===cur);
+    d.classList.toggle('used', !!u && k!==cur);
+    const badge=d.querySelector('.cpu');
+    badge.textContent = u? u.join(' ') : '';
+    badge.classList.toggle('off', !u);
   });
   const sp=SPECIALS[c.key];
   $('#pname').textContent = sp
@@ -3703,7 +3763,8 @@ $$('.seg button').forEach(b=>{
     const o=b.dataset.o, v=+b.dataset.v;
     $$(`.seg button[data-o="${o}"]`).forEach(x=>x.classList.remove('on'));
     b.classList.add('on'); AUD.select();
-    if(o==='cnt') CFG.players=v;
+    if(o==='cnt'){ CFG.players=v; slotIdx=Math.min(slotIdx,v-1); selected=ROSTER[slotIdx];
+      buildSlots(); refreshSelect(); }
     if(o==='stock') CFG.stocks=v;
     if(o==='lv') CFG.cpuLv=v;
     if(o==='q') applyQuality(v);
@@ -3862,7 +3923,8 @@ if(location.search.indexOf('dbg')>=0){
     CHARS, CHARMAP, SPECIALS, MOVES, SFX,
     get fighters(){ return fighters; },
     get mode(){ return MODE; },
-    pick(k){ selected=k; refreshSelect(); },
+    get roster(){ return ROSTER; },
+    pick(k,i){ ROSTER[i||0]=k; if(!i) selected=k; refreshSelect(); },
     start(){ startMatch(); countdown=0; },
     fill(i){ fighters[i||0].meter=100; },
     fire(name,i){ startMove(fighters[i||0],name); },
