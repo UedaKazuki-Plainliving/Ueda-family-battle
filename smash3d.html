@@ -114,6 +114,13 @@ canvas#gl{position:absolute;inset:0;width:100%;height:100%;display:block}
   background:linear-gradient(180deg,rgba(18,22,42,.66),rgba(8,10,22,.86));border:1px solid var(--line);
   backdrop-filter:blur(10px);transition:transform .18s,box-shadow .18s}
 .port.dead{opacity:.32;filter:grayscale(1)}
+/* 自分のポート。CPU と並んでも一目で分かるようにする */
+.port.me{border-color:rgba(255,176,32,.60);
+  background:linear-gradient(180deg,rgba(58,42,14,.72),rgba(20,13,4,.88));
+  box-shadow:0 0 0 1px rgba(255,176,32,.30),0 10px 30px rgba(255,140,20,.22)}
+.port.me .pn{color:#ffd9a0;font-weight:900}
+.port.me .you{display:inline-block;margin-right:4px;padding:1px 5px;border-radius:5px;
+  background:var(--accent);color:#1b1300;font-size:8.5px;font-weight:900;letter-spacing:.08em}
 .port .pn{font-size:9.5px;letter-spacing:.1em;color:var(--dim);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .port .pct{font-size:clamp(19px,5vw,31px);font-weight:900;line-height:1.05;font-variant-numeric:tabular-nums;
   text-shadow:0 2px 10px rgba(0,0,0,.7);transition:color .2s}
@@ -724,6 +731,40 @@ TEX.blob      = toTex(blobCanvas(),1,true);
 TEX.spark     = toTex(sparkCanvas(),1,true);
 TEX.blob.wrapS=TEX.blob.wrapT=THREE.ClampToEdgeWrapping;
 TEX.spark.wrapS=TEX.spark.wrapT=THREE.ClampToEdgeWrapping;
+
+/* 自分のキャラを指す「YOU」の札 */
+function youTagCanvas(){
+  const c=cv(256,128), x=c.getContext('2d');
+  const ox=12, oy=20, w=232, h=88, r=24;
+  x.beginPath();
+  x.moveTo(ox+r,oy);
+  x.arcTo(ox+w,oy,ox+w,oy+h,r); x.arcTo(ox+w,oy+h,ox,oy+h,r);
+  x.arcTo(ox,oy+h,ox,oy,r);     x.arcTo(ox,oy,ox+w,oy,r);
+  x.closePath();
+  x.lineWidth=10; x.strokeStyle='rgba(0,0,0,.62)'; x.stroke();
+  x.fillStyle='rgba(255,255,255,.97)'; x.fill();
+  x.fillStyle='#14100a';
+  x.font='900 58px "Hiragino Kaku Gothic ProN","Yu Gothic UI",system-ui,sans-serif';
+  x.textAlign='center'; x.textBaseline='middle';
+  x.fillText('YOU',128,oy+h/2+2);
+  return c;
+}
+/* 足元に敷く光の輪 */
+function footRingCanvas(){
+  const S=128, c=cv(S,S), x=c.getContext('2d');
+  const g=x.createRadialGradient(S/2,S/2,S*.24,S/2,S/2,S*.5);
+  g.addColorStop(0,'rgba(255,255,255,0)');
+  g.addColorStop(.58,'rgba(255,255,255,.18)');
+  g.addColorStop(.80,'rgba(255,255,255,1)');
+  g.addColorStop(.93,'rgba(255,255,255,.42)');
+  g.addColorStop(1,'rgba(255,255,255,0)');
+  x.fillStyle=g; x.fillRect(0,0,S,S);
+  return c;
+}
+TEX.youTag  = toTex(youTagCanvas(),1,true);
+TEX.footRing= toTex(footRingCanvas(),1,true);
+TEX.youTag.wrapS=TEX.youTag.wrapT=THREE.ClampToEdgeWrapping;
+TEX.footRing.wrapS=TEX.footRing.wrapT=THREE.ClampToEdgeWrapping;
 const fabCache={};
 function fabricTex(hex,rep=2){
   const k=hex+'_'+rep; if(fabCache[k]) return fabCache[k];
@@ -2212,10 +2253,28 @@ class Fighter{
       new THREE.MeshPhysicalMaterial({color:this.color,transparent:true,opacity:.30,roughness:.05,
         metalness:0,transmission:.6,thickness:.6,emissive:this.color,emissiveIntensity:.55,depthWrite:false}));
     this.shieldM.visible=false; this.shieldM.renderOrder=7; scene.add(this.shieldM);
-    /* プレイヤーマーカー */
-    this.marker=new THREE.Mesh(new THREE.ConeGeometry(.20,.42,4),
-      new THREE.MeshBasicMaterial({color:this.color,toneMapped:false}));
-    this.marker.rotation.x=Math.PI; scene.add(this.marker);
+    /* プレイヤーマーカー。背景や他キャラに隠れないよう常に手前へ描く */
+    this.marker=new THREE.Group();
+    {
+      const basic=o=>new THREE.MeshBasicMaterial(
+        Object.assign({toneMapped:false,depthTest:false,transparent:true},o));
+      /* 白フチ（大きめの矢印を先に描いて縁取りにする） */
+      const edge=new THREE.Mesh(new THREE.ConeGeometry(.48,.84,4),basic({color:0xffffff,opacity:.92}));
+      edge.rotation.x=Math.PI; edge.renderOrder=20;
+      const arrow=new THREE.Mesh(new THREE.ConeGeometry(.34,.62,4),basic({color:this.color}));
+      arrow.rotation.x=Math.PI; arrow.renderOrder=21;
+      const tag=new THREE.Sprite(new THREE.SpriteMaterial({map:TEX.youTag,
+        toneMapped:false,depthTest:false,transparent:true}));
+      tag.scale.set(1.62,.81,1); tag.position.y=1.02; tag.renderOrder=22;
+      this.marker.add(edge,arrow,tag);
+    }
+    this.marker.visible=false; scene.add(this.marker);
+    /* 足元の光の輪。矢印が背景に紛れても位置が分かるようにする */
+    this.footRing=new THREE.Mesh(new THREE.PlaneGeometry(1,1),
+      new THREE.MeshBasicMaterial({map:TEX.footRing,color:this.color,toneMapped:false,
+        transparent:true,depthWrite:false,blending:THREE.AdditiveBlending,opacity:.85}));
+    this.footRing.rotation.x=-Math.PI/2; this.footRing.renderOrder=3;
+    this.footRing.visible=false; scene.add(this.footRing);
     /* 初期ポーズ用の現在値 */
     this.cur=basePose();
     this.ai=human?null:new AI(this);
@@ -2273,7 +2332,8 @@ class Fighter{
     this.falls++; this.stocks--;
     if(this.lastHitBy>=0 && fighters[this.lastHitBy] && fighters[this.lastHitBy]!==this) fighters[this.lastHitBy].kos++;
     HUD.ko(this, this.lastHitBy>=0?fighters[this.lastHitBy]:null);
-    if(this.stocks<=0){ this.setState('dead'); this.obj.visible=false; this.shadow.visible=false; this.marker.visible=false; }
+    if(this.stocks<=0){ this.setState('dead'); this.obj.visible=false; this.shadow.visible=false;
+      this.marker.visible=false; this.footRing.visible=false; }
     else { this.respawn(); }
     HUD.sync();
   }
@@ -2801,11 +2861,27 @@ function syncVisual(f,dt){
     f.shieldM.material.opacity=.18+f.shieldHP/100*.24;
   } else f.shieldM.visible=false;
 
-  /* マーカー */
-  f.marker.visible = f.human && f.state!=='dead';
-  if(f.marker.visible){
-    f.marker.position.set(f.pos.x, f.pos.y+f.h*1.14+Math.sin(performance.now()/300)*.08, 0);
+  /* マーカー（自分のキャラ） */
+  const isMe = f.human && f.state!=='dead';
+  f.marker.visible = isMe;
+  if(isMe){
+    const t=performance.now()/1000;
+    /* 開始カウント中は大きく出して、自分がどれかすぐ分かるようにする */
+    const intro = countdown>0 ? 1.6 : 1;
+    f.marker.position.set(f.pos.x, f.pos.y+f.h*1.20+Math.sin(t*3.4)*.10, 0);
     f.marker.rotation.y+=dt*2.2;
+    f.marker.scale.setScalar((1+Math.sin(t*4.2)*.06)*intro);
+  }
+  /* 足元の輪は空中でも真下の床に出す。高いほど薄く大きくして位置を追えるようにする */
+  f.footRing.visible = isMe && gp!==null;
+  if(f.footRing.visible){
+    const t=performance.now()/1000;
+    const intro = countdown>0 ? 1.6 : 1;
+    const up=clamp((f.pos.y-gp)/9,0,1);
+    const s=(2.0+Math.sin(t*3.0)*.18)*f.S*f.sizeK*intro*(1+up*1.3);
+    f.footRing.position.set(f.pos.x, gp+.045, f.pos.z||0);
+    f.footRing.scale.set(s,s,1);
+    f.footRing.material.opacity=(.70+Math.sin(t*3.0)*.16)*(1-up*.62);
   }
   /* 無敵点滅 */
   const inv=f.invuln>0 && f.state!=='dead';
@@ -3505,10 +3581,10 @@ const HUD={
   build(){
     const c=$('#ports'); c.innerHTML=''; this.els=[];
     fighters.forEach(f=>{
-      const d=document.createElement('div'); d.className='port';
+      const d=document.createElement('div'); d.className='port'+(f.human?' me':'');
       const col='#'+f.color.toString(16).padStart(6,'0');
       d.innerHTML=`<div class="rail" style="background:${col};box-shadow:0 0 12px ${col}"></div>
-        <div class="pn">${f.human?'YOU · ':'CPU · '}${f.def.name}</div>
+        <div class="pn">${f.human?'<span class="you">YOU</span>':'CPU · '}${f.def.name}</div>
         <div class="pct">0<small>%</small></div>
         <div class="stk" style="color:${col}"></div>
         <div class="sup"><i></i></div>`;
@@ -3634,7 +3710,8 @@ function demoCamera(dt){
 
 /* --------------------------------------------------------- 試合開始 */
 function startMatch(){
-  for(const f of fighters){ scene.remove(f.obj); scene.remove(f.shadow); scene.remove(f.shieldM); scene.remove(f.marker); }
+  for(const f of fighters){ scene.remove(f.obj); scene.remove(f.shadow); scene.remove(f.shieldM);
+    scene.remove(f.marker); scene.remove(f.footRing); }
   fighters=[];
   setDemoVisible(false);
   const roster=ROSTER.slice(0,CFG.players).map(k=>CHARMAP[k]?k:CHARS[0].key);
@@ -3788,7 +3865,8 @@ $('#resume').addEventListener('click',()=>togglePause());
 $('#toselect').addEventListener('click',()=>{ MODE='select'; $('#hud').classList.remove('on'); gotoSelect(); });
 function gotoSelect(){
   AUD.start(); MODE='select';
-  for(const f of fighters){ f.obj.visible=false; f.shadow.visible=false; f.shieldM.visible=false; f.marker.visible=false; }
+  for(const f of fighters){ f.obj.visible=false; f.shadow.visible=false; f.shieldM.visible=false;
+    f.marker.visible=false; f.footRing.visible=false; }
   setDemoVisible(true);
   $('#hud').classList.remove('on'); showLayer('#select'); buildSelect();
 }
@@ -3927,6 +4005,7 @@ if(location.search.indexOf('dbg')>=0){
     pick(k,i){ ROSTER[i||0]=k; if(!i) selected=k; refreshSelect(); },
     start(){ startMatch(); countdown=0; },
     fill(i){ fighters[i||0].meter=100; },
+    setCountdown(v){ countdown=v; },
     fire(name,i){ startMove(fighters[i||0],name); },
     /* 描画を介さず固定タイムステップでゲーム進行だけを回す（自動検証用） */
     sim(n,dt,ai){ const d=dt||1/60;
